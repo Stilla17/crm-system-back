@@ -6,6 +6,7 @@ import { CompaniesModule } from './companies/companies.module.js';
 import { BranchesModule } from './branches/branches.module.js';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
+import { RolesModule } from './roles/roles.module.js';
 
 @Module({
   imports: [
@@ -23,6 +24,8 @@ import { MongooseModule } from '@nestjs/mongoose';
         uri: configService.get<string>('MONGODB_URI'),
       }),
     }),
+
+    RolesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
