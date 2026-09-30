@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Role } from './schema/user.schema.js';
+import { Role } from './schema/role.schema.js';
 import { Model } from 'mongoose';
 import { CreateRoleDto } from './dto/create-role.dto.js';
 import { UpdateRoleDto } from './dto/update-role.dto.js';

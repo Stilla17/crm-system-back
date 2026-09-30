@@ -1,6 +1,5 @@
 import {
   IsEnum,
-  isNotEmpty,
   IsNotEmpty,
   IsOptional,
   IsString,
@@ -20,8 +19,8 @@ export class CreateUserDto {
 
   @IsString()
   @IsNotEmpty()
-  @MinLength(8)
-  @Exclude()
+  @MinLength(6)
+  @Exclude({ toPlainOnly: true })
   password: string;
 
   @IsString()

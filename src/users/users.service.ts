@@ -21,7 +21,7 @@ export class UsersService {
   }
 
   async getUserById(id: string) {
-    const user = this.userModel.findOne({ id });
+    const user = await this.userModel.findOne({ id });
 
     if (!user) {
       throw new NotFoundException('User Not Found');
@@ -55,7 +55,7 @@ export class UsersService {
   }
 
   async updateUser(id: string, dto: UpdateUserDto) {
-    const user = this.userModel.findOneAndUpdate({ id }, dto, {
+    const user = await this.userModel.findOneAndUpdate({ id }, dto, {
       new: true,
       runValidators: true,
     });
@@ -68,12 +68,16 @@ export class UsersService {
   }
 
   async deleteUser(id: string) {
-    const user = this.userModel.findOneAndDelete({ id });
+    const user = await this.userModel.findOneAndDelete({ id });
 
     if (!user) {
       throw new NotFoundException('User topilmadi');
     }
 
     return { message: "User o'chirildi" };
+  }
+
+  async findByLogin(login: string) {
+    return this.userModel.findOne({ login });
   }
 }

@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { RolesService } from './roles.service.js';
 import { RolesController } from './roles.controller.js';
 import { MongooseModule } from '@nestjs/mongoose';
-import { Role, RoleSchema } from './schema/user.schema.js';
+import { Role, RoleSchema } from './schema/role.schema.js';
 
 @Module({
   providers: [RolesService],
