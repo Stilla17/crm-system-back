@@ -58,6 +58,9 @@ export class User {
     default: 'active',
   })
   status: UserStatus;
+
+  @Prop({ type: String, select: false, required: false })
+  refreshToken: string;
   createdAt: Date;
   updatedAt: Date;
 }

@@ -30,6 +30,14 @@ export class UsersService {
     return user;
   }
 
+  async getUserByIdWithRefreshToken(id: string) {
+    const user = await this.userModel.findOne({ id }).select('+refreshToken');
+    if (!user) {
+      throw new NotFoundException('User Not Found');
+    }
+    return user;
+  }
+
   async createUser(dto: CreateUserDto) {
     const login = dto.login.toLocaleLowerCase().trim();
     const existingUser = await this.userModel.findOne({
@@ -78,6 +86,15 @@ export class UsersService {
   }
 
   async findByLogin(login: string) {
-    return this.userModel.findOne({ login });
+    return this.userModel.findOne({ login }).select('+password');
+  }
+
+  async updateRefreshToken(id: string, refreshToken: string | null) {
+    let hash: string | null = null;
+    if (refreshToken) {
+      hash = await bcrypt.hash(refreshToken, 10);
+    }
+
+    await this.userModel.findOneAndUpdate({ id }, { refreshToken: hash });
   }
 }

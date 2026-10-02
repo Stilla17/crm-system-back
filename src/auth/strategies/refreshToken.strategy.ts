@@ -1,33 +1,35 @@
 import { Injectable } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
-import { UsersService } from '../../users/users.service.js';
+import { Request } from 'express';
 
 // Token ichidagi payload tipi
 interface JwtPayload {
   sub: string;
-  login: string;
   roleId: string;
 }
 
 @Injectable()
-export class JwtStrategy extends PassportStrategy(Strategy) {
-  constructor(private readonly usersService: UsersService) {
+export class RefreshTokenStrategy extends PassportStrategy(
+  Strategy,
+  'jwt-refresh',
+) {
+  constructor() {
     super({
       // Tokenni Request Header'dan (Authorization: Bearer <token>) oladi
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       // Tokenni tekshirish uchun maxfiy kalit (.env dan olinadi)
-      secretOrKey: process.env.JWT_ACCESS_SECRET!,
+      secretOrKey: process.env.JWT_REFRESH_SECRET!,
+      // requestni validate methodiga yuboradi, shunda userni tekshirish mumkin bo'ladi
+      passReqToCallback: true,
     });
   }
 
-  async validate(payload: JwtPayload) {
-    const user = await this.usersService.getUserById(payload.sub);
-
+  validate(req: Request, payload: JwtPayload) {
+    const refreshToken = req.get('Authorization')?.replace('Bearer', '').trim();
     return {
-      id: user.id,
-      login: user.login,
-      roleId: user.roleId,
+      ...payload,
+      refreshToken,
     };
   }
 }
