@@ -6,7 +6,6 @@ import { Request } from 'express';
 // Token ichidagi payload tipi
 interface JwtPayload {
   sub: string;
-  roleId: string;
 }
 
 @Injectable()
@@ -17,7 +16,9 @@ export class RefreshTokenStrategy extends PassportStrategy(
   constructor() {
     super({
       // Tokenni Request Header'dan (Authorization: Bearer <token>) oladi
-      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+      jwtFromRequest: ExtractJwt.fromExtractors([
+        (request: Request) => request.cookies?.refreshToken ?? null,
+      ]),
       // Tokenni tekshirish uchun maxfiy kalit (.env dan olinadi)
       secretOrKey: process.env.JWT_REFRESH_SECRET!,
       // requestni validate methodiga yuboradi, shunda userni tekshirish mumkin bo'ladi
@@ -29,7 +30,7 @@ export class RefreshTokenStrategy extends PassportStrategy(
     const refreshToken = req.get('Authorization')?.replace('Bearer', '').trim();
     return {
       ...payload,
-      refreshToken,
+      refreshToken: req.cookies?.refreshToken ?? refreshToken,
     };
   }
 }

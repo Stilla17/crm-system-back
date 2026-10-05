@@ -12,11 +12,10 @@ export class AuthService {
   ) {}
 
   // Ikkala tokkenni olib yasab berish uchun method
-  async getTokens(userId: string, roleId: string, login: string) {
+  async getTokens(userId: string, login: string) {
     const payload = {
       sub: userId,
       login,
-      roleId,
     };
 
     const [accessToken, refreshToken] = await Promise.all([
@@ -48,11 +47,7 @@ export class AuthService {
       throw new UnauthorizedException("Login yoki parol noto'g'ri");
     }
 
-    const tokens = await this.getTokens(
-      user.id.toString(),
-      user.roleId,
-      user.login,
-    );
+    const tokens = await this.getTokens(user.id.toString(), user.login);
 
     await this.usersService.updateRefreshToken(
       user.id.toString(),
@@ -75,11 +70,7 @@ export class AuthService {
       throw new UnauthorizedException('Yaroqsiz refresh token');
     }
 
-    const tokens = await this.getTokens(
-      user.id.toString(),
-      user.roleId,
-      user.login,
-    );
+    const tokens = await this.getTokens(user.id.toString(), user.login);
 
     await this.usersService.updateRefreshToken(
       user.id.toString(),

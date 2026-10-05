@@ -1,7 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { randomUUID } from 'crypto';
 import { HydratedDocument } from 'mongoose';
-import { Role } from '../../roles/schema/role.schema.js';
 
 export type UserDocument = HydratedDocument<User>;
 export enum UserStatus {
@@ -26,16 +25,22 @@ export class User {
   @Prop({
     type: String,
     required: true,
-    ref: Role.name,
+    trim: true,
   })
-  roleId: string;
+  name: string;
 
   @Prop({
     type: String,
     required: true,
     trim: true,
   })
-  name: string;
+  roleName: string;
+
+   @Prop({
+    type: [String],
+    default: [],
+  })
+  permissions: string[];
 
   @Prop({
     type: String,

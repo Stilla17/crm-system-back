@@ -1,4 +1,6 @@
 import {
+  ArrayNotEmpty,
+  IsArray,
   IsEnum,
   IsNotEmpty,
   IsOptional,
@@ -15,7 +17,11 @@ export class CreateUserDto {
 
   @IsString()
   @IsNotEmpty()
-  roleId: string;
+  roleName: string;
+
+  @IsString({ each: true })
+  @IsArray()
+  permissions: string[];
 
   @IsString()
   @IsNotEmpty()

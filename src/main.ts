@@ -2,11 +2,20 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module.js';
 import { ValidationPipe } from '@nestjs/common';
 import * as dns from 'node:dns';
+import cookieParser from 'cookie-parser';
 
 dns.setServers(['1.1.1.1', '1.0.0.1']);
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  app.use(cookieParser());
+  app.setGlobalPrefix('api/v1');
+
+  app.enableCors({
+    origin: 'http://localhost:3000',
+    credentials: true,
+  });
+
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,

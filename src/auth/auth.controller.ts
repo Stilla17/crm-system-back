@@ -5,14 +5,16 @@ import {
   HttpCode,
   HttpStatus,
   Post,
-  Req,
   Request,
+  Res,
   UseGuards,
 } from '@nestjs/common';
 import { AuthService } from './auth.service.js';
 import { LoginDto } from './dto/login.dto.js';
 import { JwtAuthGuard } from './guards/jwt-auth.guard.js';
 import { RefreshTokenGuard } from './guards/refreshToken.guard.js';
+import { clearAuthCookies, setAuthCookies } from './utils/cookie.helper.js';
+import type { Response } from 'express';
 
 @Controller('auth')
 export class AuthController {
@@ -20,23 +22,45 @@ export class AuthController {
 
   @HttpCode(HttpStatus.OK)
   @Post('login')
-  login(@Body() dto: LoginDto) {
-    return this.authService.login(dto);
+  async login(
+    @Body() dto: LoginDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const tokens = await this.authService.login(dto);
+
+    setAuthCookies(res, tokens);
+
+    return {
+      message: 'Tizimga muvaffaqiyatli kirildi',
+    };
   }
 
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
   @Post('logout')
-  logout(@Request() req: any) {
-    return this.authService.logout(req.user.id);
+  async logout(@Request() req: any, @Res({ passthrough: true }) res: Response) {
+    await this.authService.logout(req.user.id);
+    clearAuthCookies(res);
+
+    return {
+      message: 'Tizimdan chiqildi',
+    };
   }
 
   @UseGuards(RefreshTokenGuard)
   @Post('refresh')
-  refreshTokens(@Request() req: any) {
-    const userId = req.user.sub;
-    const refreshToken = req.user.refreshToken;
-    return this.authService.refreshTokens(userId, refreshToken);
+  async refreshTokens(
+    @Request() req: any,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const tokens = await this.authService.refreshTokens(
+      req.user.sub,
+      req.user.refreshToken,
+    );
+    setAuthCookies(res, tokens);
+    return {
+      message: 'Tokenlar yangilandi',
+    };
   }
 
   @UseGuards(JwtAuthGuard)
