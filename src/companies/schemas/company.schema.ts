@@ -23,7 +23,7 @@ export class Company {
     required: true,
     trim: true,
   })
-  name: string;
+  companyName: string;
 
   @Prop({
     type: String,

@@ -45,7 +45,7 @@ export class Book {
     default: 0,
     min: 0,
   })
-  bookCount: number;
+  stockQuantity: number;
 
   createdAt: Date;
   updatedAt: Date;
