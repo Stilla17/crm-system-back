@@ -2,23 +2,18 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { randomUUID } from 'crypto';
 import { HydratedDocument } from 'mongoose';
 
-export type UserDocument = HydratedDocument<User>;
-export enum UserStatus {
-  ACTIVE = 'active',
-  INACTIVE = 'inactive',
-}
+export type RoleDocument = HydratedDocument<Role>;
 
 @Schema({
-  collection: 'users',
+  collection: 'roles',
   timestamps: true,
   versionKey: false,
 })
-export class User {
+export class Role {
   @Prop({
     type: String,
     default: () => randomUUID(),
     unique: true,
-    required: true,
   })
   id: string;
 
@@ -34,14 +29,16 @@ export class User {
     required: true,
     trim: true,
   })
-  name: string;
+  roleName: string;
 
   @Prop({
     type: String,
     required: true,
     trim: true,
+    lowercase: true,
+    unique: true,
   })
-  roleName: string;
+  slug: string;
 
   @Prop({
     type: [String],
@@ -50,31 +47,14 @@ export class User {
   permissions: string[];
 
   @Prop({
-    type: String,
-    required: true,
-    select: false,
+    type: Boolean,
+    default: true,
   })
-  password: string;
+  isActive: boolean;
 
-  @Prop({
-    type: String,
-    required: true,
-    trim: false,
-    lowercase: true,
-    unique: true,
-  })
-  login: string;
-
-  @Prop({
-    type: String,
-    default: 'active',
-  })
-  status: UserStatus;
-
-  @Prop({ type: String, select: false, required: false })
-  refreshToken: string;
   createdAt: Date;
+
   updatedAt: Date;
 }
 
-export const UserSchema = SchemaFactory.createForClass(User);
+export const RoleSchema = SchemaFactory.createForClass(Role);

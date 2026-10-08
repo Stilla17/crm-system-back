@@ -10,6 +10,8 @@ import { CustomersModule } from './customers/customers.module.js';
 import { BooksModule } from './books/books.module.js';
 import { ShipmentsModule } from './shipments/shipments.module.js';
 import { PaymentsModule } from './payments/payments.module.js';
+import { RolesController } from './roles/roles.controller.js';
+import { RolesModule } from './roles/roles.module.js';
 
 @Module({
   imports: [
@@ -31,8 +33,9 @@ import { PaymentsModule } from './payments/payments.module.js';
     BooksModule,
     ShipmentsModule,
     PaymentsModule,
+    RolesModule,
   ],
-  controllers: [AppController],
+  controllers: [AppController, RolesController],
   providers: [AppService],
 })
 export class AppModule {}

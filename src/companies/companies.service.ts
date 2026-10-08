@@ -8,6 +8,7 @@ import { Company, CompanyDocument } from './schemas/company.schema.js';
 import { Model } from 'mongoose';
 import { CreateCompanyDto } from './dto/create-company.dto.js';
 import { UpdateCompanyDto } from './dto/update-company.dto.js';
+import { isMongoDuplicateKeyError } from '../common/utils/mongo-error.util.js';
 
 @Injectable()
 export class CompaniesService {
@@ -15,15 +16,6 @@ export class CompaniesService {
     @InjectModel(Company.name)
     private readonly companyModel: Model<CompanyDocument>,
   ) {}
-
-  private isDuplicateKeyError(error: unknown): error is { code: number } {
-    return (
-      typeof error === 'object' &&
-      error !== null &&
-      'code' in error &&
-      error.code === 11000
-    );
-  }
 
   async getAllCompanies() {
     return this.companyModel.find().sort({ createdAt: -1 }).exec();
@@ -46,9 +38,10 @@ export class CompaniesService {
         slug: dto.slug.toLowerCase().trim(),
       });
     } catch (error: unknown) {
-      if (this.isDuplicateKeyError(error)) {
-        throw new ConflictException('Bunday slug bilan company mavjud');
+      if (isMongoDuplicateKeyError(error)) {
+        throw new ConflictException('Bunday slug bilan role mavjud');
       }
+
       throw error;
     }
   }
@@ -77,9 +70,10 @@ export class CompaniesService {
 
       return company;
     } catch (error: unknown) {
-      if (this.isDuplicateKeyError(error)) {
-        throw new ConflictException('Bunday slug bilan company mavjud');
+      if (isMongoDuplicateKeyError(error)) {
+        throw new ConflictException('Bunday slug bilan role mavjud');
       }
+
       throw error;
     }
   }
