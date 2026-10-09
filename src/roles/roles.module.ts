@@ -3,11 +3,9 @@ import { RolesService } from './roles.service.js';
 import { RolesController } from './roles.controller.js';
 import { MongooseModule } from '@nestjs/mongoose';
 import { Role, RoleSchema } from './schemas/role.schema.js';
+import { PassportModule } from '@nestjs/passport';
+import { PermissionsGuard } from '../auth/guards/permissions.guard.js';
 
-@Module({
-  providers: [RolesService],
-  controllers: [RolesController],
-})
 @Module({
   imports: [
     MongooseModule.forFeature([
@@ -16,9 +14,10 @@ import { Role, RoleSchema } from './schemas/role.schema.js';
         schema: RoleSchema,
       },
     ]),
+    PassportModule.register({ defaultStrategy: 'jwt' }),
   ],
   controllers: [RolesController],
-  providers: [RolesService],
+  providers: [RolesService, PermissionsGuard],
   exports: [RolesService],
 })
 export class RolesModule {}

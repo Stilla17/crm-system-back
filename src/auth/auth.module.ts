@@ -7,10 +7,12 @@ import { JwtStrategy } from './strategies/jwt.strategy.js';
 import { PassportModule } from '@nestjs/passport';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { RefreshTokenStrategy } from './strategies/refreshToken.strategy.js';
+import { RolesModule } from '../roles/roles.module.js';
 
 @Module({
   imports: [
     UsersModule,
+    RolesModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
 
     JwtModule.registerAsync({

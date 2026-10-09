@@ -3,12 +3,13 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { InjectModel, SchemaFactory } from '@nestjs/mongoose';
+import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { CreateRoleDto } from './dto/create-role.dto.js';
 import { UpdateRoleDto } from './dto/update-role.dto.js';
 import { Role } from './schemas/role.schema.js';
 import { isMongoDuplicateKeyError } from '../common/utils/mongo-error.util.js';
+import { RoleScope } from './enum/role-scope.enum.js';
 
 @Injectable()
 export class RolesService {
@@ -17,10 +18,15 @@ export class RolesService {
     private readonly roleModel: Model<Role>,
   ) {}
   // Role yaratadi
-  async createRole(dto: CreateRoleDto) {
+  async createRole(dto: CreateRoleDto, companyId: string) {
     const slug = dto.slug.toLowerCase().trim();
     try {
-      return await this.roleModel.create({ ...dto, slug });
+      return await this.roleModel.create({
+        ...dto,
+        slug,
+        companyId,
+        scope: RoleScope.COMPANY,
+      });
     } catch (error: unknown) {
       if (isMongoDuplicateKeyError(error)) {
         throw new ConflictException('Bunday rol mavjud');
@@ -31,13 +37,13 @@ export class RolesService {
   }
 
   //   Barcha Rolellarni olib keladi
-  async getAllRoles() {
-    return this.roleModel.find().sort({ createAt: -1 }).exec();
+  async getAllRoles(companyId: string) {
+    return this.roleModel.find({ companyId }).sort({ createdAt: -1 }).exec();
   }
 
   //   Bitta Role olib kelish
-  async getRoleById(id: string) {
-    const role = await this.roleModel.findOne({ id });
+  async getRoleById(id: string, companyId: string) {
+    const role = await this.roleModel.findOne({ id, companyId }).exec();
 
     if (!role) {
       throw new NotFoundException('Rol topilmadi');
@@ -47,7 +53,7 @@ export class RolesService {
   }
 
   //   Update Role
-  async updateRole(id: string, dto: UpdateRoleDto) {
+  async updateRole(id: string, dto: UpdateRoleDto, companyId: string) {
     try {
       const updateData = {
         ...dto,
@@ -56,7 +62,7 @@ export class RolesService {
           : {}),
       };
       const role = await this.roleModel.findOneAndUpdate(
-        { id },
+        { id, companyId },
         { $set: updateData },
         {
           new: true,
@@ -78,32 +84,8 @@ export class RolesService {
     }
   }
 
-  //   Delete Role
-  async deleteRole(id: string) {
-    const role = await this.roleModel.findOneAndUpdate(
-      { id },
-      {
-        $set: {
-          isActive: false,
-        },
-      },
-      {
-        new: true,
-        runValidators: true,
-      },
-    );
-
-    if (!role) {
-      throw new NotFoundException('Rol topilmadi');
-    }
-
-    return {
-      message: "Role o'chirildi",
-      role,
-    };
+  // auth method
+  async findRoleForAuth(id: string) {
+    return this.roleModel.findOne({ id }).exec();
   }
 }
-
-export const RoleSchema = SchemaFactory.createForClass(Role);
-
-RoleSchema.index({ companyId: 1, slug: 1 }, { unique: true });

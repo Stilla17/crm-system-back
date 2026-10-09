@@ -1,6 +1,7 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { randomUUID } from 'crypto';
 import { HydratedDocument } from 'mongoose';
+import { RoleScope } from '../enum/role-scope.enum.js';
 
 export type RoleDocument = HydratedDocument<Role>;
 
@@ -19,10 +20,11 @@ export class Role {
 
   @Prop({
     type: String,
-    required: true,
+    required: false,
+    default: null,
     index: true,
   })
-  companyId: string;
+  companyId?: string | null;
 
   @Prop({
     type: String,
@@ -33,10 +35,16 @@ export class Role {
 
   @Prop({
     type: String,
+    enum: RoleScope,
+    required: true,
+  })
+  scope: RoleScope;
+
+  @Prop({
+    type: String,
     required: true,
     trim: true,
     lowercase: true,
-    unique: true,
   })
   slug: string;
 
@@ -58,3 +66,5 @@ export class Role {
 }
 
 export const RoleSchema = SchemaFactory.createForClass(Role);
+
+RoleSchema.index({ companyId: 1, slug: 1 }, { unique: true });

@@ -25,9 +25,17 @@ export class User {
   @Prop({
     type: String,
     required: true,
+    default: null,
     index: true,
   })
-  companyId: string;
+  companyId?: string | null;
+
+  @Prop({
+    type: String,
+    required: true,
+    index: true,
+  })
+  roleId: string;
 
   @Prop({
     type: String,
@@ -35,19 +43,6 @@ export class User {
     trim: true,
   })
   name: string;
-
-  @Prop({
-    type: String,
-    required: true,
-    trim: true,
-  })
-  roleName: string;
-
-  @Prop({
-    type: [String],
-    default: [],
-  })
-  permissions: string[];
 
   @Prop({
     type: String,

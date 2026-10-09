@@ -9,15 +9,17 @@ import { InjectModel } from '@nestjs/mongoose';
 import { CreateUserDto } from './dto/create-user.dto.js';
 import * as bcrypt from 'bcrypt';
 import { UpdateUserDto } from './dto/update-user.dto.js';
+import { RolesService } from '../roles/roles.service.js';
 
 @Injectable()
 export class UsersService {
   constructor(
     @InjectModel(User.name) private readonly userModel: Model<User>,
+    private readonly rolesService: RolesService,
   ) {}
 
-  async getAllUsers() {
-    return this.userModel.find().sort({ createAt: -1 });
+  async getAllUsers(companyId: string) {
+    return this.userModel.find({ companyId }).sort({ createdAt: -1 }).exec();
   }
 
   async getUserById(id: string) {
@@ -30,16 +32,30 @@ export class UsersService {
     return user;
   }
 
+  async getUserByIdForCompany(id: string, companyId: string) {
+    const user = await this.userModel.findOne({ id, companyId }).exec();
+
+    if (!user) {
+      throw new NotFoundException('User topilmadi');
+    }
+
+    return user;
+  }
+
   async getUserByIdWithRefreshToken(id: string) {
-    const user = await this.userModel.findOne({ id }).select('+refreshToken');
+    const user = await this.userModel
+      .findOne({ id })
+      .select('+refreshToken')
+      .exec();
     if (!user) {
       throw new NotFoundException('User Not Found');
     }
     return user;
   }
 
-  async createUser(dto: CreateUserDto) {
+  async createUser(dto: CreateUserDto, companyId: string) {
     const login = dto.login.toLocaleLowerCase().trim();
+    await this.rolesService.getRoleById(dto.roleId, companyId);
     const existingUser = await this.userModel.findOne({
       login,
     });
@@ -49,12 +65,12 @@ export class UsersService {
     }
 
     //Praolni hashlash 2^10
-    const saltRounds = 10;
-    const passwordHash = await bcrypt.hash(dto.password, saltRounds);
+    const passwordHash = await bcrypt.hash(dto.password, 10);
 
     // Foydalanuvchini saqlash
     const newUser = await this.userModel.create({
       ...dto,
+      companyId,
       login,
       password: passwordHash,
     });
@@ -62,8 +78,11 @@ export class UsersService {
     return newUser;
   }
 
-  async updateUser(id: string, dto: UpdateUserDto) {
-    const user = await this.userModel.findOneAndUpdate({ id }, dto, {
+  async updateUser(id: string, dto: UpdateUserDto, companyId: string) {
+    if (dto.roleId) {
+      await this.rolesService.getRoleById(dto.roleId, companyId);
+    }
+    const user = await this.userModel.findOneAndUpdate({ id, companyId }, dto, {
       new: true,
       runValidators: true,
     });
@@ -75,8 +94,8 @@ export class UsersService {
     return user;
   }
 
-  async deleteUser(id: string) {
-    const user = await this.userModel.findOneAndDelete({ id });
+  async deleteUser(id: string, companyId: string) {
+    const user = await this.userModel.findOneAndDelete({ id, companyId });
 
     if (!user) {
       throw new NotFoundException('User topilmadi');

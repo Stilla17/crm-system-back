@@ -5,11 +5,13 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { User, UserSchema } from './schemas/user.schema.js';
 import { PermissionsGuard } from '../auth/guards/permissions.guard.js';
 import { PassportModule } from '@nestjs/passport';
+import { RolesModule } from '../roles/roles.module.js';
 
 @Module({
   imports: [
     MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]),
     PassportModule.register({ defaultStrategy: 'jwt' }),
+    RolesModule,
   ],
   controllers: [UsersController],
   providers: [UsersService, PermissionsGuard],

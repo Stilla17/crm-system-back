@@ -10,8 +10,9 @@ import { CustomersModule } from './customers/customers.module.js';
 import { BooksModule } from './books/books.module.js';
 import { ShipmentsModule } from './shipments/shipments.module.js';
 import { PaymentsModule } from './payments/payments.module.js';
-import { RolesController } from './roles/roles.controller.js';
 import { RolesModule } from './roles/roles.module.js';
+import { SeedModule } from './database/seeds/seed.module.js';
+import { getMongoConnectionUri } from './config/mongodb-uri.js';
 
 @Module({
   imports: [
@@ -23,7 +24,9 @@ import { RolesModule } from './roles/roles.module.js';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: async (configService: ConfigService) => ({
-        uri: configService.get<string>('MONGODB_URI'),
+        uri: getMongoConnectionUri(
+          configService.getOrThrow<string>('MONGODB_URI'),
+        ),
       }),
     }),
     UsersModule,
@@ -34,8 +37,9 @@ import { RolesModule } from './roles/roles.module.js';
     ShipmentsModule,
     PaymentsModule,
     RolesModule,
+    SeedModule
   ],
-  controllers: [AppController, RolesController],
+  controllers: [AppController],
   providers: [AppService],
 })
 export class AppModule {}
