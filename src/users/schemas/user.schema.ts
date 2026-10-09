@@ -24,7 +24,7 @@ export class User {
 
   @Prop({
     type: String,
-    required: true,
+    required: false,
     default: null,
     index: true,
   })

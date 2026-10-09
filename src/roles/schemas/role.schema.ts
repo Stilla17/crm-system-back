@@ -2,6 +2,7 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { randomUUID } from 'crypto';
 import { HydratedDocument } from 'mongoose';
 import { RoleScope } from '../enum/role-scope.enum.js';
+import { Permission } from '../../auth/permissions/permissions.enum.js';
 
 export type RoleDocument = HydratedDocument<Role>;
 
@@ -52,7 +53,7 @@ export class Role {
     type: [String],
     default: [],
   })
-  permissions: string[];
+  permissions: Permission[];
 
   @Prop({
     type: Boolean,

@@ -1,5 +1,6 @@
 import {
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -10,6 +11,8 @@ import { UpdateRoleDto } from './dto/update-role.dto.js';
 import { Role } from './schemas/role.schema.js';
 import { isMongoDuplicateKeyError } from '../common/utils/mongo-error.util.js';
 import { RoleScope } from './enum/role-scope.enum.js';
+import { Permission } from '../auth/permissions/permissions.enum.js';
+import { SYSTEM_ONLY_PERMISSIONS } from '../auth/permissions/role-permissions.js';
 
 @Injectable()
 export class RolesService {
@@ -17,8 +20,27 @@ export class RolesService {
     @InjectModel(Role.name)
     private readonly roleModel: Model<Role>,
   ) {}
+
+  // Role tekshiradi
+  private validateCompanyPermissions(permissions?: Permission[]): void {
+    if (!permissions) {
+      return;
+    }
+
+    const hasSystemPermission = permissions.some((permission) =>
+      SYSTEM_ONLY_PERMISSIONS.includes(permission),
+    );
+
+    if (hasSystemPermission) {
+      throw new ForbiddenException(
+        'Company role uchun system permission berib bo‘lmaydi',
+      );
+    }
+  }
+
   // Role yaratadi
   async createRole(dto: CreateRoleDto, companyId: string) {
+    this.validateCompanyPermissions(dto.permissions);
     const slug = dto.slug.toLowerCase().trim();
     try {
       return await this.roleModel.create({
@@ -54,6 +76,7 @@ export class RolesService {
 
   //   Update Role
   async updateRole(id: string, dto: UpdateRoleDto, companyId: string) {
+    this.validateCompanyPermissions(dto.permissions);
     try {
       const updateData = {
         ...dto,

@@ -14,6 +14,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 import { PermissionsGuard } from '../auth/guards/permissions.guard.js';
 import { RequirePermissions } from '../auth/decorators/permissions.decorator.js';
 import { CurrentCompanyId } from '../common/decorators/current-company-id.decorator.js';
+import { Permission } from '../auth/permissions/permissions.enum.js';
 
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller('roles')
@@ -21,7 +22,7 @@ export class RolesController {
   constructor(private readonly rolesService: RolesService) {}
 
   @Post()
-  @RequirePermissions('roles.create')
+  @RequirePermissions(Permission.ROLES_CREATE)
   createRole(
     @Body() dto: CreateRoleDto,
     @CurrentCompanyId()
@@ -32,6 +33,7 @@ export class RolesController {
 
   @Get()
   @RequirePermissions('roles.read')
+  @RequirePermissions(Permission.ROLES_READ)
   getAllRoles(
     @CurrentCompanyId()
     companyId: string,
@@ -40,7 +42,7 @@ export class RolesController {
   }
 
   @Get(':id')
-  @RequirePermissions('roles.read')
+  @RequirePermissions(Permission.ROLES_READ)
   getRoleById(
     @Param('id') id: string,
     @CurrentCompanyId()
@@ -50,7 +52,7 @@ export class RolesController {
   }
 
   @Patch(':id')
-  @RequirePermissions('roles.update')
+  @RequirePermissions(Permission.ROLES_UPDATE)
   updateRole(
     @Param('id') id: string,
     @Body() dto: UpdateRoleDto,

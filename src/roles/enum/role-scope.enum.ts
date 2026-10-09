@@ -1,4 +1,4 @@
 export enum RoleScope {
   SYSTEM = 'system',
-  COMPANY = ' company',
+  COMPANY = 'company',
 }

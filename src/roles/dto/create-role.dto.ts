@@ -2,10 +2,12 @@ import {
   ArrayUnique,
   IsArray,
   IsBoolean,
+  IsEnum,
   IsNotEmpty,
   IsOptional,
   IsString,
 } from 'class-validator';
+import { Permission } from '../../auth/permissions/permissions.enum.js';
 
 export class CreateRoleDto {
   @IsString()
@@ -17,10 +19,10 @@ export class CreateRoleDto {
   slug: string;
 
   @IsArray()
-  @IsString({ each: true })
+  @IsEnum(Permission, { each: true })
   @ArrayUnique()
   @IsOptional()
-  permissions?: string[];
+  permissions?: Permission[];
 
   @IsBoolean()
   @IsOptional()

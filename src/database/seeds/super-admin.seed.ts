@@ -7,6 +7,7 @@ import { ConfigService } from '@nestjs/config';
 import { RoleScope } from '../../roles/enum/role-scope.enum.js';
 import { randomUUID } from 'crypto';
 import * as bcrypt from 'bcrypt';
+import { SUPER_ADMIN_PERMISSIONS } from '../../auth/permissions/role-permissions.js';
 
 @Injectable()
 export class SuperAdminSeed {
@@ -47,27 +48,13 @@ export class SuperAdminSeed {
           slug: 'super-admin',
           scope: RoleScope.SYSTEM,
           companyId: null,
-          permissions: [
-            'companies.read',
-            'companies.create',
-            'companies.update',
-            'companies.delete',
-
-            'roles.read',
-            'roles.create',
-            'roles.update',
-
-            'users.read',
-            'users.create',
-            'users.update',
-            'users.delete',
-          ],
+          permissions: [...SUPER_ADMIN_PERMISSIONS],
           isActive: true,
         },
       },
       {
         upsert: true,
-        new: true,
+        returnDocument: 'after',
         runValidators: true,
       },
     );

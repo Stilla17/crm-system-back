@@ -37,7 +37,7 @@ import { getMongoConnectionUri } from './config/mongodb-uri.js';
     ShipmentsModule,
     PaymentsModule,
     RolesModule,
-    SeedModule
+    SeedModule,
   ],
   controllers: [AppController],
   providers: [AppService],
