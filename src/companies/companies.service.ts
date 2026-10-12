@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
@@ -18,6 +19,16 @@ export class CompaniesService {
     private readonly companyModel: Model<CompanyDocument>,
   ) {}
 
+  private generateSlug(value: string): string {
+    return value
+      .normalize('NFKD')
+      .toLowerCase()
+      .trim()
+      .replace(/[ʻ’']/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+  }
+
   async getAllCompanies() {
     return this.companyModel.find().sort({ createdAt: -1 }).exec();
   }
@@ -33,10 +44,16 @@ export class CompaniesService {
   }
 
   async createCompany(dto: CreateCompanyDto): Promise<CompanyDocument> {
+    const slug = this.generateSlug(dto.companyName);
+
+    if (!slug) {
+      throw new BadRequestException('Company nomidan slug yaratib bo‘lmadi');
+    }
+
     try {
       return await this.companyModel.create({
         ...dto,
-        slug: dto.slug.toLowerCase().trim(),
+        slug,
       });
     } catch (error: unknown) {
       if (isMongoDuplicateKeyError(error)) {
@@ -55,7 +72,6 @@ export class CompaniesService {
           {
             $set: {
               ...dto,
-              ...(dto.slug ? { slug: dto.slug.toLowerCase().trim() } : {}),
             },
           },
           {

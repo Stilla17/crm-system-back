@@ -30,15 +30,9 @@ export class Company {
     required: true,
     unique: true,
     trim: true,
+    lowercase: true,
   })
   slug: string;
-
-  @Prop({
-    type: String,
-    required: true,
-    trim: true,
-  })
-  color: string;
 
   @Prop({
     type: String,

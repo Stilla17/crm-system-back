@@ -7,14 +7,6 @@ export class CreateCompanyDto {
 
   @IsString()
   @IsNotEmpty()
-  slug: string;
-
-  @IsString()
-  @IsNotEmpty()
-  color: string;
-
-  @IsString()
-  @IsNotEmpty()
   type: string;
 
   @IsBoolean({ message: 'isActive must be a boolean' })
