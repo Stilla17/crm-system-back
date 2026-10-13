@@ -1,64 +1,55 @@
-# Role, User va Auth tizimi
+# Access Control
 
-Ushbu hujjat CRM backenddagi autentifikatsiya va ruxsatlarni boshqarish tizimini tushuntiradi.
+Ushbu hujjat CRM backenddagi autentifikatsiya, rollar, permissionlar va kompaniyalararo izolyatsiyaning **joriy implementatsiyasi**ni tushuntiradi.
 
-## 1. Asosiy tushunchalar
+## 1. Arxitektura
 
-Tizim quyidagi bog‘lanish asosida ishlaydi:
+Tizim RBAC (Role-Based Access Control) asosida ishlaydi:
 
 ```text
-Company
-  ├── Roles
-  │     └── Permissions
-  └── Users
-        └── roleId → Role
+User ── roleId ──> Role ──> permissions[]
+  │                   │
+  └── companyId       ├── companyId
+                      └── scope: system | company
 ```
 
-- Har bir `User` bitta kompaniyaga tegishli.
-- Har bir `Role` bitta kompaniyaga tegishli.
-- User o‘z kompaniyasidagi bitta role bilan bog‘lanadi.
-- Permissionlar user ichida emas, role ichida saqlanadi.
-- JWT tekshirilganda user va role bazadan qayta olinadi.
-- Endpointga kirish role ichidagi permissionlar orqali tekshiriladi.
+- `User` permissionlarni bevosita saqlamaydi; ular userga biriktirilgan `Role`dan olinadi.
+- `system` scope’dagi role global boshqaruv uchun ishlatiladi va kompaniyaga tegishli emas.
+- `company` scope’dagi role faqat o‘z kompaniyasi doirasida ishlaydi.
+- Himoyalangan har bir requestda user va role bazadan qayta o‘qiladi. Shu sababli role permissionlari yoki faolligi o‘zgarsa, o‘zgarish amaldagi access token tugashini kutmasdan qo‘llanadi.
 
-## 2. Ma’lumotlar tuzilishi
+## 2. Ma’lumotlar modeli
 
 ### Role
 
 ```ts
 interface Role {
   id: string;
-  companyId: string;
+  companyId?: string | null;
   roleName: string;
+  scope: 'system' | 'company';
   slug: string;
-  permissions: string[];
+  permissions: Permission[];
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
 ```
 
-Misol:
+Muhim qoidalar:
 
-```json
-{
-  "id": "role-uuid",
-  "companyId": "company-uuid",
-  "roleName": "Manager",
-  "slug": "manager",
-  "permissions": ["users.read", "customers.read", "customers.create"],
-  "isActive": true
-}
-```
-
-`companyId + slug` juftligi unique hisoblanadi. Shu sababli bitta kompaniyada ikkita `manager` role bo‘lmaydi, lekin boshqa kompaniya o‘zining `manager` role’ini yarata oladi.
+- `system` role uchun `companyId: null` bo‘ladi.
+- API orqali yaratilgan role har doim `scope: 'company'` bo‘ladi.
+- `{ companyId, slug }` juftligi unique.
+- `slug` kichik harflarga o‘tkazilib, ikki chetidagi bo‘sh joylar olib tashlanadi.
+- Company role’ga `companies.create` va `companies.delete` permissionlarini berish taqiqlangan.
 
 ### User
 
 ```ts
 interface User {
   id: string;
-  companyId: string;
+  companyId?: string | null;
   roleId: string;
   name: string;
   login: string;
@@ -70,77 +61,45 @@ interface User {
 }
 ```
 
-User ichida `roleName` va `permissions` saqlanmaydi. Ular `roleId` orqali role’dan olinadi.
+- System user uchun `companyId: null` bo‘ladi.
+- Company user o‘z kompaniyasidagi role’ga biriktirilishi kerak.
+- `login` global unique va kichik harflarda saqlanadi.
+- Parol va refresh token bazada bcrypt hash ko‘rinishida saqlanadi hamda oddiy query natijasiga kiritilmaydi.
 
-## 3. Nega companyId frontenddan olinmaydi?
+## 3. Autentifikatsiya
 
-Himoyalangan endpointlarda `companyId` request body yoki URL’dan emas, login qilgan userdan olinadi:
+Barcha URL’lar `/api/v1` prefiksi bilan boshlanadi.
 
-```ts
-req.user.companyId;
-```
+### Login
 
-Bu foydalanuvchining boshqa kompaniya ID’sini yuborib, uning ma’lumotlariga kirishining oldini oladi.
-
-Controller misoli:
-
-```ts
-createRole(
-  @Body() dto: CreateRoleDto,
-  @Req() req: AuthenticatedRequest,
-) {
-  return this.rolesService.createRole(
-    dto,
-    req.user.companyId,
-  );
-}
-```
-
-Service querylarida ham `companyId` majburiy ishlatiladi:
-
-```ts
-this.roleModel.findOne({
-  id: roleId,
-  companyId,
-});
-```
-
-## 4. AuthenticatedRequest
-
-JWT muvaffaqiyatli tekshirilgandan keyin `request.user` quyidagi ko‘rinishda bo‘ladi:
-
-```ts
-interface AuthenticatedRequest extends Request {
-  user: {
-    id: string;
-    companyId: string;
-    roleId: string;
-    permissions: string[];
-  };
-}
-```
-
-Umumiy type manzili:
-
-```text
-src/common/types/authenticated-request.type.ts
-```
-
-## 5. Login oqimi
-
-```text
+```http
 POST /api/v1/auth/login
-        ↓
-Login bo‘yicha user topiladi
-        ↓
-Parol bcrypt bilan tekshiriladi
-        ↓
-Access va refresh token yaratiladi
-        ↓
-Tokenlar HTTP cookie orqali qaytariladi
+Content-Type: application/json
 ```
 
-JWT payload minimal saqlanadi:
+```json
+{
+  "login": "admin",
+  "password": "secret123"
+}
+```
+
+Muvaffaqiyatli javob:
+
+```json
+{
+  "message": "Tizimga muvaffaqiyatli kirildi"
+}
+```
+
+Tokenlar response body’da emas, `HttpOnly` cookie sifatida qaytariladi:
+
+| Cookie         | Amal qilish muddati | Sozlamalar                                         |
+| -------------- | ------------------: | -------------------------------------------------- |
+| `accessToken`  |           15 daqiqa | `httpOnly`, `sameSite=lax`, production’da `secure` |
+| `refreshToken` |               1 kun | `httpOnly`, `sameSite=lax`, production’da `secure` |
+
+JWT payload minimal:
 
 ```ts
 {
@@ -149,275 +108,291 @@ JWT payload minimal saqlanadi:
 }
 ```
 
-Permissionlar token ichida saqlanmaydi. Har bir himoyalangan requestda JWT strategy:
-
-1. `payload.sub` orqali userni topadi.
-2. `user.roleId` va `user.companyId` orqali role’ni topadi.
-3. User faol ekanini tekshiradi.
-4. Role faol ekanini tekshiradi.
-5. Role permissionlarini `request.user`ga qo‘shadi.
-
-Natija:
+Frontend cookie yuborishi uchun cross-origin requestlarda credentials yoqilgan bo‘lishi kerak:
 
 ```ts
+fetch(url, {
+  method: 'GET',
+  credentials: 'include',
+});
+```
+
+### Profile, refresh va logout
+
+| Method | Endpoint               | Himoya        | Vazifasi                                                     |
+| ------ | ---------------------- | ------------- | ------------------------------------------------------------ |
+| `GET`  | `/api/v1/auth/profile` | Access token  | Joriy userning auth kontekstini qaytaradi                    |
+| `POST` | `/api/v1/auth/refresh` | Refresh token | Ikkala tokenni yangilaydi                                    |
+| `POST` | `/api/v1/auth/logout`  | Access token  | Bazadagi refresh tokenni tozalaydi va cookie’larni o‘chiradi |
+
+`profile` javobining ko‘rinishi:
+
+```json
 {
-  id: user.id,
-  login: user.login,
-  companyId: user.companyId,
-  roleId: user.roleId,
-  roleName: role.roleName,
-  permissions: role.permissions,
+  "id": "user-uuid",
+  "login": "admin",
+  "companyId": "company-uuid",
+  "roleId": "role-uuid",
+  "roleName": "Company Admin",
+  "roleScope": "company",
+  "permissions": ["users.read", "roles.read"]
 }
 ```
 
-Bu usulda role permissionlari o‘zgarsa, eski access token ishlatilayotgan bo‘lsa ham yangi permissionlar darhol qo‘llanadi.
+## 4. Himoyalangan request oqimi
 
-## 6. Guardlar qanday ishlaydi?
+```text
+Request
+  ↓
+JwtAuthGuard: accessToken cookie va imzoni tekshiradi
+  ↓
+JwtStrategy: user va role’ni bazadan oladi
+  ↓
+User/role faolligi va scope mosligi tekshiriladi
+  ↓
+PermissionsGuard: endpoint permissionlarini tekshiradi
+  ↓
+Controller → Service
+```
 
-Controller ikki guard bilan himoyalanadi:
+`JwtStrategy` muvaffaqiyatli ishlagach, `request.user` quyidagi ko‘rinishda bo‘ladi:
+
+```ts
+interface AuthenticatedRequest extends Request {
+  user: {
+    id: string;
+    companyId: string | null;
+    roleId: string;
+    roleName: string;
+    roleScope: 'system' | 'company';
+    permissions: string[];
+  };
+}
+```
+
+Tekshiruvlar:
+
+1. Token ichidagi `sub` bo‘yicha user topiladi.
+2. User `active` ekanligi tekshiriladi.
+3. `roleId` bo‘yicha role topiladi va `isActive` tekshiriladi.
+4. Company role bo‘lsa, user va role `companyId` qiymatlari bir xil bo‘lishi shart.
+5. System role bo‘lsa, userning `companyId` qiymati `null` bo‘lishi shart.
+6. Endpoint talab qilgan barcha permissionlar user role’ida mavjudligi tekshiriladi.
+
+Controllerdagi standart qo‘llanish:
 
 ```ts
 @UseGuards(JwtAuthGuard, PermissionsGuard)
+@RequirePermissions(Permission.USERS_READ)
+@Get()
+getAllUsers(@CurrentCompanyId() companyId: string) {
+  return this.usersService.getAllUsers(companyId);
+}
 ```
 
-### JwtAuthGuard
+`@RequirePermissions()`ga bir nechta permission berilsa, userda ularning **barchasi** bo‘lishi kerak.
 
-- Access token mavjudligini tekshiradi.
-- Token imzosini tekshiradi.
-- Userni bazadan topadi.
-- User statusini tekshiradi.
-- Role’ni bazadan topadi.
-- Role statusini tekshiradi.
-- `request.user`ni tayyorlaydi.
+## 5. Company isolation
 
-### PermissionsGuard
-
-Endpoint talab qilgan permissionni tekshiradi:
+Company endpointlarida `companyId` body, query yoki URL’dan olinmaydi. U tekshirilgan `request.user`dan `@CurrentCompanyId()` orqali olinadi:
 
 ```ts
-@RequirePermissions('roles.create')
+const companyId = request.user.companyId;
 ```
 
-User role’ida permission bo‘lmasa:
+Service querylari ham kompaniya bilan cheklanadi:
 
-```http
-403 Forbidden
+```ts
+find({ companyId });
+findOne({ id, companyId });
+findOneAndUpdate({ id, companyId }, update);
+findOneAndDelete({ id, companyId });
 ```
 
-Token noto‘g‘ri, user inactive yoki role inactive bo‘lsa:
+Natijada company user boshqa kompaniyaning `id` qiymatini bilsa ham uning role yoki user ma’lumotiga kira olmaydi. `@CurrentCompanyId()` system userda kompaniya yo‘qligi sababli `403 Forbidden` qaytaradi; shu bois `/roles` va `/users` company-context endpointlaridir.
 
-```http
-401 Unauthorized
-```
+## 6. Permissionlar
+
+Permission nomlash formati: `resource.action`.
+
+| Resource  | Permissionlar                                                                |
+| --------- | ---------------------------------------------------------------------------- |
+| Companies | `companies.read`, `companies.create`, `companies.update`, `companies.delete` |
+| Roles     | `roles.read`, `roles.create`, `roles.update`, `roles.delete`                 |
+| Users     | `users.read`, `users.create`, `users.update`, `users.delete`                 |
+| Customers | `customers.read`, `customers.create`, `customers.update`, `customers.delete` |
+| Books     | `books.read`, `books.create`, `books.update`, `books.delete`                 |
+| Shipments | `shipments.read`, `shipments.create`, `shipments.update`, `shipments.delete` |
+| Payments  | `payments.read`, `payments.create`, `payments.update`, `payments.delete`     |
+
+`Permission` enum yagona manba sifatida `src/auth/permissions/permissions.enum.ts` faylida saqlanadi.
+
+Eslatma: permission enum’da mavjud bo‘lishi endpoint implementatsiya qilinganini anglatmaydi. Hozir `customers`, `books`, `shipments` va `payments` controllerlarida endpointlar yo‘q; `roles.delete` uchun ham endpoint mavjud emas.
+
+### Standart role to‘plamlari
+
+- `SUPER_ADMIN_PERMISSIONS` — barcha permissionlar.
+- `COMPANY_ADMIN_PERMISSIONS` — role, user, customer, book, shipment va payment boshqaruvi; `roles.delete` kiritilmagan.
+- `MANAGER_PERMISSIONS` — customer yaratish/o‘qish/yangilash, book o‘qish, shipment yaratish/o‘qish/yangilash va payment o‘qish.
+
+Bu to‘plamlar `src/auth/permissions/role-permissions.ts` faylida joylashgan.
 
 ## 7. Role endpointlari
 
-Barcha endpointlar JWT va permission bilan himoyalangan.
+Barcha role endpointlari access token, permission va company kontekstini talab qiladi.
 
-| Method  | Endpoint            | Permission     | Vazifasi                   |
-| ------- | ------------------- | -------------- | -------------------------- |
-| `POST`  | `/api/v1/roles`     | `roles.create` | Role yaratadi              |
-| `GET`   | `/api/v1/roles`     | `roles.read`   | Kompaniya rolelarini oladi |
-| `GET`   | `/api/v1/roles/:id` | `roles.read`   | Bitta role’ni oladi        |
-| `PATCH` | `/api/v1/roles/:id` | `roles.update` | Role’ni yangilaydi         |
+| Method  | Endpoint            | Permission     | Vazifasi                                |
+| ------- | ------------------- | -------------- | --------------------------------------- |
+| `POST`  | `/api/v1/roles`     | `roles.create` | Company role yaratadi                   |
+| `GET`   | `/api/v1/roles`     | `roles.read`   | Joriy kompaniya role’larini oladi       |
+| `GET`   | `/api/v1/roles/:id` | `roles.read`   | Joriy kompaniyadagi bitta role’ni oladi |
+| `PATCH` | `/api/v1/roles/:id` | `roles.update` | Joriy kompaniyadagi role’ni yangilaydi  |
 
-Role yaratish body misoli:
+Role yaratish:
 
 ```json
 {
   "roleName": "Manager",
   "slug": "manager",
-  "permissions": ["users.read", "customers.read", "customers.create"]
+  "permissions": ["customers.read", "customers.create", "shipments.read"],
+  "isActive": true
 }
 ```
 
-`companyId` body’da yuborilmaydi. U JWT orqali olinadi.
+`companyId` va `scope` client tomonidan yuborilmaydi. Global validation noma’lum maydonlarni rad etadi; backend ularni mos ravishda joriy kompaniya ID’si va `company` qiymati bilan belgilaydi.
 
-Role’ni nofaol qilish:
+Inactive role’ga user biriktirishga joriy implementatsiyada ruxsat beriladi, ammo shu user himoyalangan endpointga murojaat qilganda `401 Unauthorized` oladi.
 
-```http
-PATCH /api/v1/roles/:id
-```
+## 8. User endpointlari
 
-```json
-{
-  "isActive": false
-}
-```
+Barcha user endpointlari access token, permission va company kontekstini talab qiladi.
 
-## 8. Inactive role qoidasi
+| Method   | Endpoint            | Permission     | Vazifasi                                              |
+| -------- | ------------------- | -------------- | ----------------------------------------------------- |
+| `POST`   | `/api/v1/users`     | `users.create` | Joriy kompaniyada user yaratadi                       |
+| `GET`    | `/api/v1/users`     | `users.read`   | Joriy kompaniya userlarini oladi                      |
+| `GET`    | `/api/v1/users/:id` | `users.read`   | Joriy kompaniyadagi bitta userni oladi                |
+| `PATCH`  | `/api/v1/users/:id` | `users.update` | Userning `name`, `roleId` yoki `status`ini yangilaydi |
+| `DELETE` | `/api/v1/users/:id` | `users.delete` | Joriy kompaniyadagi userni o‘chiradi                  |
 
-Loyihada inactive role’ga user biriktirishga ruxsat berilgan.
-
-Bu quyidagicha ishlaydi:
-
-```text
-Inactive role + user yaratish → ruxsat beriladi
-Inactive role + API request    → 401 qaytadi
-Role active qilinadi           → user ishlay boshlaydi
-```
-
-Shuning uchun user yaratishda role mavjudligi va kompaniyaga tegishliligi tekshiriladi, ammo `isActive` tekshirilmaydi.
-
-## 9. User endpointlari
-
-| Method   | Endpoint            | Permission     | Vazifasi                         |
-| -------- | ------------------- | -------------- | -------------------------------- |
-| `POST`   | `/api/v1/users`     | `users.create` | User yaratadi                    |
-| `GET`    | `/api/v1/users`     | `users.read`   | Kompaniya userlarini oladi       |
-| `GET`    | `/api/v1/users/:id` | `users.read`   | Kompaniyadagi bitta userni oladi |
-| `PATCH`  | `/api/v1/users/:id` | `users.update` | Userni yangilaydi                |
-| `DELETE` | `/api/v1/users/:id` | `users.delete` | Userni o‘chiradi                 |
-
-User yaratish body misoli:
+User yaratish:
 
 ```json
 {
   "name": "Ali Valiyev",
   "roleId": "role-uuid",
   "login": "ali",
-  "password": "strong-password"
+  "password": "strong-password",
+  "status": "active"
 }
 ```
 
-User yaratilganda:
+Qoidalar:
 
-1. Role shu kompaniyaga tegishli ekanligi tekshiriladi.
-2. Login takrorlanmaganligi tekshiriladi.
-3. Parol bcrypt bilan hash qilinadi.
-4. `companyId` login qilgan admin userdan olinadi.
-5. User bazaga saqlanadi.
+- Parol kamida 6 belgidan iborat.
+- Role joriy kompaniyaga tegishli bo‘lishi shart.
+- Login global miqyosda takrorlanmasligi kerak.
+- `PATCH /users/:id` orqali login va parolni o‘zgartirib bo‘lmaydi.
+- Oddiy read querylarda schema’dagi `select: false` sababli parol tanlanmaydi. Yangi user yaratish response’i alohida sanitizatsiya qilinmagan — production API’da parol hashini response’dan chiqarib tashlash kerak.
 
-User role’i yangilanganda yangi role ham shu kompaniyaga tegishli ekanligi tekshiriladi.
+## 9. Company endpointlari
 
-## 10. Company isolation qoidasi
+| Method   | Endpoint                | Permission         | Qo‘shimcha cheklov                          |
+| -------- | ----------------------- | ------------------ | ------------------------------------------- |
+| `GET`    | `/api/v1/companies`     | `companies.read`   | Yo‘q                                        |
+| `GET`    | `/api/v1/companies/:id` | `companies.read`   | Yo‘q                                        |
+| `POST`   | `/api/v1/companies`     | `companies.create` | Permission company role’ga berilmaydi       |
+| `PATCH`  | `/api/v1/companies/:id` | `companies.update` | Yo‘q                                        |
+| `DELETE` | `/api/v1/companies/:id` | `companies.delete` | `roleScope === 'system'` ham talab qilinadi |
 
-Oddiy controller querylari doim company bilan cheklanishi kerak:
+Company endpointlari global ishlaydi; ular `@CurrentCompanyId()` bilan cheklanmagan. `companies.create` va `companies.delete` system-only permissionlar sifatida belgilangan. O‘chirish endpointi permissiondan tashqari system scope’ni ham alohida tekshiradi.
 
-```ts
-find({ companyId });
-```
+## 10. Super admin yaratish
 
-```ts
-findOne({ id, companyId });
-```
-
-```ts
-findOneAndUpdate({ id, companyId }, update);
-```
-
-```ts
-findOneAndDelete({ id, companyId });
-```
-
-Faqat JWT va refresh token kabi ichki, imzolangan identifikator bilan ishlaydigan auth metodlari userni global `id` orqali topishi mumkin.
-
-## 11. Permission nomlash qoidasi
-
-Permission formati:
-
-```text
-resource.action
-```
-
-Misollar:
-
-```text
-roles.read
-roles.create
-roles.update
-
-users.read
-users.create
-users.update
-users.delete
-
-companies.read
-companies.create
-companies.update
-companies.delete
-```
-
-Katta loyihada permission stringlarini enum yoki constant orqali boshqarish tavsiya qilinadi:
-
-```ts
-export enum Permission {
-  ROLES_READ = 'roles.read',
-  ROLES_CREATE = 'roles.create',
-  ROLES_UPDATE = 'roles.update',
-  USERS_READ = 'users.read',
-  USERS_CREATE = 'users.create',
-  USERS_UPDATE = 'users.update',
-  USERS_DELETE = 'users.delete',
-}
-```
-
-## 12. HTTP statuslar
-
-| Status | Ma’nosi                         |
-| ------ | ------------------------------- |
-| `200`  | So‘rov muvaffaqiyatli           |
-| `201`  | Yangi ma’lumot yaratildi        |
-| `400`  | DTO yoki payload noto‘g‘ri      |
-| `401`  | Token, user yoki role faol emas |
-| `403`  | Kerakli permission yo‘q         |
-| `404`  | User yoki role topilmadi        |
-| `409`  | Login yoki slug takrorlangan    |
-
-## 13. Hozirgi test holati
-
-Tekshirish komandasi:
+Super admin oddiy API orqali emas, idempotent seed orqali yaratiladi:
 
 ```bash
-npm test
+npm run seed:super-admin
 ```
 
-Hozirgi natija:
+Kerakli environment qiymatlari:
 
-```text
-Test Files: 17 passed
-Tests:      17 passed
+```env
+MONGODB_URI=...
+JWT_ACCESS_SECRET=...
+JWT_REFRESH_SECRET=...
+SUPER_ADMIN_LOGIN=...
+SUPER_ADMIN_PASSWORD=...
+SUPER_ADMIN_NAME=...
 ```
 
-Build tekshiruvi:
+Seed quyidagilarni yaratadi:
+
+- `scope: 'system'`, `companyId: null` bo‘lgan `super-admin` role;
+- barcha mavjud permissionlar;
+- `companyId: null` bo‘lgan active super admin user.
+
+Seed qayta ishga tushirilganda mavjud role yoki user takroran yaratilmaydi.
+
+## 11. HTTP statuslar
+
+| Status | Holat                                                                     |
+| -----: | ------------------------------------------------------------------------- |
+|  `200` | O‘qish, yangilash, login yoki logout muvaffaqiyatli                       |
+|  `201` | Resource yaratildi yoki token refresh qilindi                             |
+|  `400` | DTO validation xatosi yoki noma’lum body maydoni                          |
+|  `401` | Token yaroqsiz; role topilmadi; user/role faol emas yoki scope mos emas   |
+|  `403` | Permission yo‘q, company konteksti yo‘q yoki system-only amal taqiqlangan |
+|  `404` | So‘ralgan user, role yoki company topilmadi                               |
+|  `409` | Login yoki unique slug takrorlandi                                        |
+
+## 12. Joriy cheklovlar va xavfsizlik eslatmalari
+
+- Login metodining o‘zi user va role faolligini tekshirmaydi. Login cookie qaytarishi mumkin, lekin inactive user yoki role bilan himoyalangan request `401` oladi.
+- Refresh oqimi saqlangan token hashini tekshiradi, ammo user statusi, role faolligi va role scope mosligini qayta tekshirmaydi.
+- CORS origin hozir kodda `http://localhost:3000` sifatida belgilangan.
+- Cookie `sameSite=lax`; frontend va backend turli site’larda joylashsa, production cookie/CORS konfiguratsiyasini moslashtirish kerak.
+- Company o‘chirilganda unga tegishli role va userlar avtomatik o‘chirilmaydi.
+- Role o‘chirish endpointi implementatsiya qilinmagan.
+- User yaratish service’i qaytargan yangi document alohida sanitizatsiya qilinmagan; parol hashini response’dan chiqarish lozim.
+
+## 13. Yangi himoyalangan endpoint qo‘shish
+
+1. Permissionni `Permission` enum’ga qo‘shing.
+2. Zarur standart role to‘plamlariga kiriting.
+3. Controllerga ikkala guardni ulang.
+4. Endpointga `@RequirePermissions(Permission.X)` qo‘ying.
+5. Company resource bo‘lsa, `companyId`ni faqat `@CurrentCompanyId()`dan oling.
+6. Service’dagi barcha read/update/delete querylarini `{ id, companyId }` bilan cheklang.
+7. `401`, `403` va boshqa kompaniya ID’si bilan murojaat qilish holatlari uchun test yozing.
+
+```ts
+@UseGuards(JwtAuthGuard, PermissionsGuard)
+@Controller('example')
+export class ExampleController {
+  @Get()
+  @RequirePermissions(Permission.EXAMPLE_READ)
+  findAll(@CurrentCompanyId() companyId: string) {
+    return this.exampleService.findAll(companyId);
+  }
+}
+```
+
+## 14. Tekshirish
 
 ```bash
 npm run build
+npm test
+npm run test:e2e
+npm run lint
 ```
 
-Hozirgi build muvaffaqiyatli yakunlanadi.
+Access-control o‘zgarishlarida kamida quyidagi holatlar tekshirilishi kerak:
 
-Mavjud unit testlar asosan controller va service dependencylari to‘g‘ri ulanganini tekshiradi. Quyidagi behavior testlarni keyinchalik qo‘shish kerak:
-
-- boshqa kompaniyadagi role’ni userga biriktirib bo‘lmasligi;
-- boshqa kompaniyadagi userni o‘qib yoki yangilab bo‘lmasligi;
-- duplicate role slug `409` qaytarishi;
-- duplicate login `409` qaytarishi;
-- inactive user `401` qaytarishi;
-- inactive role `401` qaytarishi;
+- tokensiz request `401` qaytarishi;
 - permissionsiz request `403` qaytarishi;
-- role permissionlari o‘zgarganda yangi permission darhol ishlashi.
-
-## 14. Qolgan tavsiya etilgan ishlar
-
-Quyidagilar buildni to‘xtatmaydi, lekin production uchun muhim:
-
-1. Login vaqtida user va role faolligini tekshirish.
-2. Refresh vaqtida user va role faolligini tekshirish.
-3. User yaratishda MongoDB duplicate-key xatosini `409`ga aylantirish.
-4. DTO stringlarini trim qilish va faqat bo‘sh joy yuborilishini rad etish.
-5. Permissionlarni enum yoki markaziy constantga ko‘chirish.
-6. Eski user ma’lumotlari uchun `companyId` va `roleId` migration yozish.
-7. Birinchi company, owner role va owner userni yaratadigan bootstrap jarayonini belgilash.
-
-## 15. Ishga tushirishdan oldingi checklist
-
-- [ ] Bazadagi barcha userlarda `companyId` mavjud.
-- [ ] Bazadagi barcha userlarda `roleId` mavjud.
-- [ ] Har bir role’da `companyId` mavjud.
-- [ ] Har bir kompaniyada kamida bitta boshqaruvchi role mavjud.
-- [ ] Boshqaruvchi role’da `roles.*` va `users.*` uchun kerakli permissionlar mavjud.
-- [ ] Compound index `{ companyId, slug }` MongoDB’da yaratilgan.
-- [ ] `.env` ichida access va refresh token secretlari mavjud.
-- [ ] `npm run build` muvaffaqiyatli.
-- [ ] `npm test` muvaffaqiyatli.
+- inactive user va inactive role `401` qaytarishi;
+- company user boshqa kompaniya resource’iga kira olmasligi;
+- company role system-only permission ola olmasligi;
+- system user company-context endpointidan foydalana olmasligi;
+- role permissioni o‘zgargach, yangi permission darhol qo‘llanishi.

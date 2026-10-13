@@ -19,6 +19,7 @@ import { RequirePermissions } from '../auth/decorators/permissions.decorator.js'
 import { Permission } from '../auth/permissions/permissions.enum.js';
 import type { AuthenticatedRequest } from '../common/types/authenticated-request.type.js';
 import { RoleScope } from '../roles/enum/role-scope.enum.js';
+import { CreateCompanyAdminDto } from './dto/create-company-admin.dto.js';
 
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller('companies')
@@ -58,5 +59,21 @@ export class CompaniesController {
       );
     }
     return this.companyService.deleteCompany(id);
+  }
+
+  @Post(':id/admin')
+  @RequirePermissions(Permission.COMPANIES_CREATE)
+  createCompanyAdmin(
+    @Param('id') companyId: string,
+    @Body() dto: CreateCompanyAdminDto,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    if (req.user.roleScope !== RoleScope.SYSTEM) {
+      throw new ForbiddenException(
+        'Company adminni faqat Super Admin yarata oladi',
+      );
+    }
+
+    return this.companyService.createCompanyAdmin(companyId, dto);
   }
 }

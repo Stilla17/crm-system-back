@@ -28,6 +28,13 @@ export class Company {
   @Prop({
     type: String,
     required: true,
+    trim: true,
+  })
+  brandColor: string;
+
+  @Prop({
+    type: String,
+    required: true,
     unique: true,
     trim: true,
     lowercase: true,

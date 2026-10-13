@@ -9,6 +9,10 @@ export class CreateCompanyDto {
   @IsNotEmpty()
   type: string;
 
+  @IsString()
+  @IsNotEmpty()
+  brandColor: string;
+
   @IsBoolean({ message: 'isActive must be a boolean' })
   @IsOptional()
   isActive?: boolean;
