@@ -5,6 +5,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { Role, RoleSchema } from './schemas/role.schema.js';
 import { PassportModule } from '@nestjs/passport';
 import { PermissionsGuard } from '../auth/guards/permissions.guard.js';
+import { SystemRolesController } from './system-roles.controller.js';
 
 @Module({
   imports: [
@@ -16,7 +17,7 @@ import { PermissionsGuard } from '../auth/guards/permissions.guard.js';
     ]),
     PassportModule.register({ defaultStrategy: 'jwt' }),
   ],
-  controllers: [RolesController],
+  controllers: [RolesController, SystemRolesController],
   providers: [RolesService, PermissionsGuard],
   exports: [RolesService],
 })

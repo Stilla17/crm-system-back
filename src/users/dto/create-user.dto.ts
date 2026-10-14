@@ -3,6 +3,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  Matches,
   MinLength,
 } from 'class-validator';
 import { UserStatus } from '../schemas/user.schema.js';
@@ -12,6 +13,10 @@ export class CreateUserDto {
   @IsString()
   @IsNotEmpty()
   name: string;
+
+  @IsString()
+  @IsNotEmpty()
+  middleName: string;
 
   @IsString()
   @IsNotEmpty()
@@ -26,6 +31,11 @@ export class CreateUserDto {
   @IsString()
   @IsNotEmpty()
   login: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @Matches(/^\+998\d{9}$/)
+  phone: string;
 
   @IsEnum(UserStatus)
   @IsOptional()

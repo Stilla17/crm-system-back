@@ -6,6 +6,7 @@ import { User, UserSchema } from './schemas/user.schema.js';
 import { PermissionsGuard } from '../auth/guards/permissions.guard.js';
 import { PassportModule } from '@nestjs/passport';
 import { RolesModule } from '../roles/roles.module.js';
+import { SystemUsersController } from './system-users.controller.js';
 
 @Module({
   imports: [
@@ -13,7 +14,7 @@ import { RolesModule } from '../roles/roles.module.js';
     PassportModule.register({ defaultStrategy: 'jwt' }),
     RolesModule,
   ],
-  controllers: [UsersController],
+  controllers: [UsersController, SystemUsersController],
   providers: [UsersService, PermissionsGuard],
   exports: [UsersService],
 })

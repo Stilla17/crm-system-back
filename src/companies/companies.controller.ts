@@ -49,15 +49,40 @@ export class CompaniesController {
   updateCompany(@Param('id') id: string, @Body() dto: UpdateCompanyDto) {
     return this.companyService.updateCompany(id, dto);
   }
+  // Companiyani arxivga solish uchun
+  @Patch(':id/archive')
+  @RequirePermissions(Permission.COMPANIES_UPDATE)
+  archiveCompany(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
+    if (req.user.roleScope !== RoleScope.SYSTEM) {
+      throw new ForbiddenException(
+        'Kompaniyani faqat Super Admin arxivlay oladi',
+      );
+    }
+
+    return this.companyService.archiveCompany(id);
+  }
+  // Companiyani arxivdan chiqarish uchun
+  @Patch(':id/restore')
+  @RequirePermissions(Permission.COMPANIES_UPDATE)
+  restoreCompany(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
+    if (req.user.roleScope !== RoleScope.SYSTEM) {
+      throw new ForbiddenException(
+        'Kompaniyani faqat Super Admin tiklay oladi',
+      );
+    }
+
+    return this.companyService.restoreCompany(id);
+  }
 
   @Delete(':id')
   @RequirePermissions(Permission.COMPANIES_DELETE)
   deleteCompany(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
     if (req.user.roleScope !== RoleScope.SYSTEM) {
       throw new ForbiddenException(
-        "Kompaniyani faqat SuperAdmin o'chira oladi",
+        "Kompaniyani faqat Super Admin o'chira oladi",
       );
     }
+
     return this.companyService.deleteCompany(id);
   }
 
@@ -75,5 +100,21 @@ export class CompaniesController {
     }
 
     return this.companyService.createCompanyAdmin(companyId, dto);
+  }
+
+  @Patch(':id/admin/replace')
+  @RequirePermissions(Permission.COMPANIES_UPDATE)
+  replaceCompanyAdmin(
+    @Param('id') companyId: string,
+    @Body() dto: CreateCompanyAdminDto,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    if (req.user.roleScope !== RoleScope.SYSTEM) {
+      throw new ForbiddenException(
+        'Company adminni faqat Super Admin almashtira oladi',
+      );
+    }
+
+    return this.companyService.replaceCompanyAdmin(companyId, dto);
   }
 }

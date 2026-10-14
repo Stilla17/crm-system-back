@@ -18,8 +18,16 @@ export class UsersService {
     private readonly rolesService: RolesService,
   ) {}
 
+  // Company Admin tokeni bilan — faqat o‘z kompaniyasidagi userlar.
   async getAllUsers(companyId: string) {
     return this.userModel.find({ companyId }).sort({ createdAt: -1 }).exec();
+  }
+  // Super Admin tokeni bilan — tanlangan kompaniya userlari.
+  async getAllUsersForSystem() {
+    return this.userModel
+      .find({ companyId: { $ne: null } })
+      .sort({ createdAt: -1 })
+      .exec();
   }
 
   async getUserById(id: string) {

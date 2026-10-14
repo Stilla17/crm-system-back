@@ -32,12 +32,8 @@ export class RolesController {
   }
 
   @Get()
-  @RequirePermissions('roles.read')
   @RequirePermissions(Permission.ROLES_READ)
-  getAllRoles(
-    @CurrentCompanyId()
-    companyId: string,
-  ) {
+  getAllRoles(@CurrentCompanyId() companyId: string) {
     return this.rolesService.getAllRoles(companyId);
   }
 

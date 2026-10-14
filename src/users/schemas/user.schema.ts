@@ -47,6 +47,13 @@ export class User {
   @Prop({
     type: String,
     required: true,
+    trim: true,
+  })
+  middleName: string;
+
+  @Prop({
+    type: String,
+    required: true,
     select: false,
   })
   password: string;
@@ -65,6 +72,12 @@ export class User {
     default: 'active',
   })
   status: UserStatus;
+
+  @Prop({
+    type: String,
+    required: true,
+  })
+  phone: string;
 
   @Prop({ type: String, select: false, required: false })
   refreshToken: string;

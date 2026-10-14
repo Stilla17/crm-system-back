@@ -15,7 +15,6 @@ import { UpdateUserDto } from './dto/update-user.dto.js';
 import { RequirePermissions } from '../auth/decorators/permissions.decorator.js';
 import { PermissionsGuard } from '../auth/guards/permissions.guard.js';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
-import type { AuthenticatedRequest } from '../common/types/authenticated-request.type.js';
 import { CurrentCompanyId } from '../common/decorators/current-company-id.decorator.js';
 import { Permission } from '../auth/permissions/permissions.enum.js';
 

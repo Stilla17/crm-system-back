@@ -63,6 +63,19 @@ export class RolesService {
     return this.roleModel.find({ companyId }).sort({ createdAt: -1 }).exec();
   }
 
+  async getRolesByCompanyForSystem(companyId: string) {
+    return this.roleModel.find({ companyId }).sort({ createdAt: -1 }).exec();
+  }
+  // Super Admin uchun barcha company rollari:
+  async getAllRolesForSystem() {
+    return this.roleModel
+      .find({
+        companyId: { $ne: null },
+      })
+      .sort({ createdAt: -1 })
+      .exec();
+  }
+
   //   Bitta Role olib kelish
   async getRoleById(id: string, companyId: string) {
     const role = await this.roleModel.findOne({ id, companyId }).exec();
