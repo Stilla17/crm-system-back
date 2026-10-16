@@ -2,7 +2,6 @@ import {
   Controller,
   ForbiddenException,
   Get,
-  Param,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -19,19 +18,7 @@ import type { AuthenticatedRequest } from '../common/types/authenticated-request
 export class SystemRolesController {
   constructor(private readonly rolesService: RolesService) {}
 
-  // Super Admin: tanlangan kompaniyaning rollari
-  @Get('companies/:companyId/roles')
-  @RequirePermissions(Permission.ROLES_READ)
-  getCompanyRoles(
-    @Param('companyId') companyId: string,
-    @Req() req: AuthenticatedRequest,
-  ) {
-    this.ensureSystemUser(req);
-
-    return this.rolesService.getRolesByCompanyForSystem(companyId);
-  }
-
-  // Super Admin: barcha kompaniyalarning rollari
+  // Super Admin: barcha global rollar
   @Get('system/roles')
   @RequirePermissions(Permission.ROLES_READ)
   getAllRoles(@Req() req: AuthenticatedRequest) {

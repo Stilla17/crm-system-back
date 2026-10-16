@@ -6,10 +6,8 @@ export const SYSTEM_ONLY_PERMISSIONS: Permission[] = [
   Permission.COMPANIES_DELETE,
 ];
 
-export const COMPANY_ADMIN_PERMISSIONS: Permission[] = [
+export const DIRECTOR_PERMISSIONS: Permission[] = [
   Permission.ROLES_READ,
-  Permission.ROLES_CREATE,
-  Permission.ROLES_UPDATE,
 
   Permission.USERS_READ,
   Permission.USERS_CREATE,

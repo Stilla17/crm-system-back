@@ -17,6 +17,7 @@ describe('UsersService', () => {
 
   const rolesServiceMock = {
     getRoleById: vi.fn(),
+    getAssignableRoleById: vi.fn(),
   };
 
   beforeEach(async () => {

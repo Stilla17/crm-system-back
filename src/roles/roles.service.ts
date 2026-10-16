@@ -21,7 +21,6 @@ export class RolesService {
     private readonly roleModel: Model<Role>,
   ) {}
 
-  // Role tekshiradi
   private validateCompanyPermissions(permissions?: Permission[]): void {
     if (!permissions) {
       return;
@@ -33,20 +32,19 @@ export class RolesService {
 
     if (hasSystemPermission) {
       throw new ForbiddenException(
-        'Company role uchun system permission berib bo‘lmaydi',
+        "Company role uchun system permission berib bo'lmaydi",
       );
     }
   }
 
-  // Role yaratadi
-  async createRole(dto: CreateRoleDto, companyId: string) {
+  async createRole(dto: CreateRoleDto) {
     this.validateCompanyPermissions(dto.permissions);
     const slug = dto.slug.toLowerCase().trim();
+
     try {
       return await this.roleModel.create({
         ...dto,
         slug,
-        companyId,
         scope: RoleScope.COMPANY,
       });
     } catch (error: unknown) {
@@ -58,27 +56,17 @@ export class RolesService {
     }
   }
 
-  //   Barcha Rolellarni olib keladi
-  async getAllRoles(companyId: string) {
-    return this.roleModel.find({ companyId }).sort({ createdAt: -1 }).exec();
-  }
-
-  async getRolesByCompanyForSystem(companyId: string) {
-    return this.roleModel.find({ companyId }).sort({ createdAt: -1 }).exec();
-  }
-  // Super Admin uchun barcha company rollari:
-  async getAllRolesForSystem() {
+  async getAllRoles() {
     return this.roleModel
-      .find({
-        companyId: { $ne: null },
-      })
+      .find({ scope: RoleScope.COMPANY })
       .sort({ createdAt: -1 })
       .exec();
   }
 
-  //   Bitta Role olib kelish
-  async getRoleById(id: string, companyId: string) {
-    const role = await this.roleModel.findOne({ id, companyId }).exec();
+  async getRoleById(id: string) {
+    const role = await this.roleModel
+      .findOne({ id, scope: RoleScope.COMPANY })
+      .exec();
 
     if (!role) {
       throw new NotFoundException('Rol topilmadi');
@@ -87,24 +75,36 @@ export class RolesService {
     return role;
   }
 
-  //   Update Role
-  async updateRole(id: string, dto: UpdateRoleDto, companyId: string) {
+  async getAssignableRoleById(id: string) {
+    const role = await this.roleModel
+      .findOne({ id, scope: RoleScope.COMPANY, isActive: true })
+      .exec();
+
+    if (!role) {
+      throw new NotFoundException('Faol company roli topilmadi');
+    }
+
+    return role;
+  }
+
+  async updateRole(id: string, dto: UpdateRoleDto) {
     this.validateCompanyPermissions(dto.permissions);
+
+    const updateData = {
+      ...dto,
+      ...(dto.slug !== undefined
+        ? { slug: dto.slug.toLowerCase().trim() }
+        : {}),
+    };
+
     try {
-      const updateData = {
-        ...dto,
-        ...(dto.slug !== undefined
-          ? { slug: dto.slug.toLowerCase().trim() }
-          : {}),
-      };
-      const role = await this.roleModel.findOneAndUpdate(
-        { id, companyId },
-        { $set: updateData },
-        {
-          new: true,
-          runValidators: true,
-        },
-      );
+      const role = await this.roleModel
+        .findOneAndUpdate(
+          { id, scope: RoleScope.COMPANY },
+          { $set: updateData },
+          { new: true, runValidators: true },
+        )
+        .exec();
 
       if (!role) {
         throw new NotFoundException('Rol topilmadi');
@@ -120,7 +120,10 @@ export class RolesService {
     }
   }
 
-  // auth method
+  async getAllRolesForSystem() {
+    return this.roleModel.find().sort({ createdAt: -1 }).exec();
+  }
+
   async findRoleForAuth(id: string) {
     return this.roleModel.findOne({ id }).exec();
   }

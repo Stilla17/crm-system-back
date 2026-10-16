@@ -18,7 +18,7 @@ export class UsersService {
     private readonly rolesService: RolesService,
   ) {}
 
-  // Company Admin tokeni bilan — faqat o‘z kompaniyasidagi userlar.
+  // Director tokeni bilan — faqat o‘z kompaniyasidagi userlar.
   async getAllUsers(companyId: string) {
     return this.userModel.find({ companyId }).sort({ createdAt: -1 }).exec();
   }
@@ -63,7 +63,7 @@ export class UsersService {
 
   async createUser(dto: CreateUserDto, companyId: string) {
     const login = dto.login.toLocaleLowerCase().trim();
-    await this.rolesService.getRoleById(dto.roleId, companyId);
+    await this.rolesService.getAssignableRoleById(dto.roleId);
     const existingUser = await this.userModel.findOne({
       login,
     });
@@ -88,7 +88,7 @@ export class UsersService {
 
   async updateUser(id: string, dto: UpdateUserDto, companyId: string) {
     if (dto.roleId) {
-      await this.rolesService.getRoleById(dto.roleId, companyId);
+      await this.rolesService.getAssignableRoleById(dto.roleId);
     }
     const user = await this.userModel.findOneAndUpdate({ id, companyId }, dto, {
       new: true,

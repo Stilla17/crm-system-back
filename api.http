@@ -1,0 +1,203 @@
+### CRM System API
+# VS Code REST Client yoki JetBrains HTTP Client orqali ishga tushirish mumkin.
+# Login javobidagi HttpOnly cookie'lar keyingi so'rovlarda avtomatik yuboriladi.
+
+@baseUrl = http://localhost:3000/api/v1
+@login = superadmin
+@password = change-me
+@companyId = COMPANY_ID
+@roleId = ROLE_ID
+@userId = USER_ID
+@newAdminId = NEW_ADMIN_USER_ID
+
+### Tizim holatini tekshirish (ochiq endpoint)
+GET {{baseUrl}}/
+
+
+### AUTH
+
+### Tizimga kirish va auth cookie'larini olish
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "login": "{{login}}",
+  "password": "{{password}}"
+}
+
+### Joriy foydalanuvchi profilini olish
+GET {{baseUrl}}/auth/profile
+
+### Access va refresh tokenlarni yangilash
+POST {{baseUrl}}/auth/refresh
+
+### Tizimdan chiqish va auth cookie'larini tozalash
+POST {{baseUrl}}/auth/logout
+
+
+### COMPANIES
+# Quyidagi endpointlar login va tegishli companies.* permissionini talab qiladi.
+
+### Barcha kompaniyalarni olish
+GET {{baseUrl}}/companies
+
+### Bitta kompaniyani ID orqali olish
+GET {{baseUrl}}/companies/{{companyId}}
+
+### Yangi kompaniya yaratish
+POST {{baseUrl}}/companies
+Content-Type: application/json
+
+{
+  "companyName": "Demo Company",
+  "type": "retail",
+  "brandColor": "#2563EB",
+  "isActive": true
+}
+
+### Kompaniya ma'lumotlarini qisman yangilash
+PATCH {{baseUrl}}/companies/{{companyId}}
+Content-Type: application/json
+
+{
+  "companyName": "Updated Company",
+  "brandColor": "#16A34A"
+}
+
+### Kompaniyani arxivlash (faqat Super Admin)
+PATCH {{baseUrl}}/companies/{{companyId}}/archive
+
+### Kompaniyani arxivdan tiklash (faqat Super Admin)
+PATCH {{baseUrl}}/companies/{{companyId}}/restore
+
+### Kompaniyani butunlay o'chirish (faqat Super Admin)
+DELETE {{baseUrl}}/companies/{{companyId}}
+
+### Kompaniya uchun yangi admin yaratish (faqat Super Admin)
+POST {{baseUrl}}/companies/{{companyId}}/admin
+Content-Type: application/json
+
+{
+  "name": "Ali",
+  "middleName": "Valiyev",
+  "phone": "+998901234567",
+  "login": "company.admin",
+  "password": "secret123"
+}
+
+### Kompaniyaning amaldagi adminini almashtirish (faqat Super Admin)
+PATCH {{baseUrl}}/companies/{{companyId}}/admin/replace
+Content-Type: application/json
+
+{
+  "newAdminId": "{{newAdminId}}"
+}
+
+
+### GLOBAL ROLES
+# Rollar barcha kompaniyalar uchun umumiy. Yaratish va yangilash faqat Super Admin uchun.
+
+### Yangi global company rol yaratish (faqat Super Admin)
+POST {{baseUrl}}/roles
+Content-Type: application/json
+
+{
+  "roleName": "Manager",
+  "slug": "manager",
+  "permissions": [
+    "users.read",
+    "customers.read",
+    "customers.create"
+  ],
+  "isActive": true
+}
+
+### Barcha global company rollarini olish
+GET {{baseUrl}}/roles
+
+### Bitta global company rolini olish
+GET {{baseUrl}}/roles/{{roleId}}
+
+### Global company rolini qisman yangilash (faqat Super Admin)
+PATCH {{baseUrl}}/roles/{{roleId}}
+Content-Type: application/json
+
+{
+  "roleName": "Senior Manager",
+  "permissions": [
+    "users.read",
+    "users.create",
+    "customers.read",
+    "customers.create",
+    "customers.update"
+  ]
+}
+
+
+### SYSTEM ROLES
+# Faqat Super Admin uchun; roles.read permissioni talab qilinadi.
+
+### Barcha global rollarni, jumladan system rollarni olish
+GET {{baseUrl}}/system/roles
+
+
+### COMPANY USERS
+# Joriy foydalanuvchining kompaniyasi doirasida ishlaydi va users.* permissionini talab qiladi.
+
+### Joriy kompaniyaning barcha foydalanuvchilarini olish
+GET {{baseUrl}}/users
+
+### Joriy kompaniyadagi bitta foydalanuvchini olish
+GET {{baseUrl}}/users/{{userId}}
+
+### Joriy kompaniyada yangi foydalanuvchi yaratish
+POST {{baseUrl}}/users
+Content-Type: application/json
+
+{
+  "name": "Vali",
+  "middleName": "Aliyev",
+  "roleId": "{{roleId}}",
+  "password": "secret123",
+  "login": "vali.aliyev",
+  "phone": "+998901234567",
+  "status": "active"
+}
+
+### Joriy kompaniyadagi foydalanuvchini qisman yangilash
+PATCH {{baseUrl}}/users/{{userId}}
+Content-Type: application/json
+
+{
+  "name": "Valijon",
+  "roleId": "{{roleId}}",
+  "status": "inactive"
+}
+
+### Joriy kompaniyadagi foydalanuvchini o'chirish
+DELETE {{baseUrl}}/users/{{userId}}
+
+
+### SYSTEM USERS
+# Faqat Super Admin uchun; tegishli users.* permissioni talab qilinadi.
+
+### Tanlangan kompaniyaning foydalanuvchilarini olish
+GET {{baseUrl}}/companies/{{companyId}}/users
+
+### Barcha kompaniyalardagi foydalanuvchilarni olish
+GET {{baseUrl}}/system/users
+
+### Tanlangan kompaniyada yangi foydalanuvchi yaratish
+POST {{baseUrl}}/companies/{{companyId}}/users
+Content-Type: application/json
+
+{
+  "name": "Hasan",
+  "middleName": "Karimov",
+  "roleId": "{{roleId}}",
+  "password": "secret123",
+  "login": "hasan.karimov",
+  "phone": "+998909876543",
+  "status": "active"
+}
+

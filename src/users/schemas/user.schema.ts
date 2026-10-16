@@ -79,6 +79,12 @@ export class User {
   })
   phone: string;
 
+  @Prop({
+    type: String,
+    required: true,
+  })
+  date: string;
+
   @Prop({ type: String, select: false, required: false })
   refreshToken: string;
   createdAt: Date;

@@ -3,19 +3,41 @@ import { UsersService } from '../users/users.service.js';
 import { JwtService } from '@nestjs/jwt';
 import { LoginDto } from './dto/login.dto.js';
 import * as bcrypt from 'bcrypt';
+import { RolesService } from '../roles/roles.service.js';
+import { RoleScope } from '../roles/enum/role-scope.enum.js';
 
 @Injectable()
 export class AuthService {
   constructor(
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
+    private readonly rolesService: RolesService,
   ) {}
 
   // Ikkala tokkenni olib yasab berish uchun method
-  async getTokens(userId: string, login: string) {
+  async getTokens(
+    userId: string,
+    login: string,
+    roleId: string,
+    companyId: string | null | undefined,
+  ) {
+    const role = await this.rolesService.findRoleForAuth(roleId);
+
+    if (!role || !role.isActive) {
+      throw new UnauthorizedException('User role faol emas yoki topilmadi');
+    }
+
+    const normalizedCompanyId = companyId ?? null;
     const payload = {
       sub: userId,
       login,
+      companyId: normalizedCompanyId,
+      roleId,
+      roleName: role.roleName,
+      roleScope: role.scope,
+      permissions: role.permissions,
+      isSystemUser:
+        role.scope === RoleScope.SYSTEM && normalizedCompanyId === null,
     };
 
     const [accessToken, refreshToken] = await Promise.all([
@@ -47,7 +69,12 @@ export class AuthService {
       throw new UnauthorizedException("Login yoki parol noto'g'ri");
     }
 
-    const tokens = await this.getTokens(user.id.toString(), user.login);
+    const tokens = await this.getTokens(
+      user.id.toString(),
+      user.login,
+      user.roleId,
+      user.companyId,
+    );
 
     await this.usersService.updateRefreshToken(
       user.id.toString(),
@@ -70,7 +97,12 @@ export class AuthService {
       throw new UnauthorizedException('Yaroqsiz refresh token');
     }
 
-    const tokens = await this.getTokens(user.id.toString(), user.login);
+    const tokens = await this.getTokens(
+      user.id.toString(),
+      user.login,
+      user.roleId,
+      user.companyId,
+    );
 
     await this.usersService.updateRefreshToken(
       user.id.toString(),

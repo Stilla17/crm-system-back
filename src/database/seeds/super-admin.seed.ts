@@ -7,7 +7,10 @@ import { ConfigService } from '@nestjs/config';
 import { RoleScope } from '../../roles/enum/role-scope.enum.js';
 import { randomUUID } from 'crypto';
 import * as bcrypt from 'bcrypt';
-import { SUPER_ADMIN_PERMISSIONS } from '../../auth/permissions/role-permissions.js';
+import {
+  DIRECTOR_PERMISSIONS,
+  SUPER_ADMIN_PERMISSIONS,
+} from '../../auth/permissions/role-permissions.js';
 
 @Injectable()
 export class SuperAdminSeed {
@@ -39,7 +42,6 @@ export class SuperAdminSeed {
       {
         slug: 'super-admin',
         scope: RoleScope.SYSTEM,
-        companyId: null,
       },
       {
         $setOnInsert: {
@@ -47,8 +49,31 @@ export class SuperAdminSeed {
           roleName: 'Super Admin',
           slug: 'super-admin',
           scope: RoleScope.SYSTEM,
-          companyId: null,
           permissions: [...SUPER_ADMIN_PERMISSIONS],
+          isActive: true,
+        },
+      },
+      {
+        upsert: true,
+        returnDocument: 'after',
+        runValidators: true,
+      },
+    );
+
+    await this.roleModel.findOneAndUpdate(
+      {
+        slug: 'director',
+        scope: RoleScope.COMPANY,
+      },
+      {
+        $setOnInsert: {
+          id: randomUUID(),
+        },
+        $set: {
+          roleName: 'Director',
+          slug: 'director',
+          scope: RoleScope.COMPANY,
+          permissions: [...DIRECTOR_PERMISSIONS],
           isActive: true,
         },
       },

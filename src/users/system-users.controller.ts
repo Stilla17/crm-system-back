@@ -1,8 +1,10 @@
 import {
+  Body,
   Controller,
   ForbiddenException,
   Get,
   Param,
+  Post,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -13,6 +15,7 @@ import { RequirePermissions } from '../auth/decorators/permissions.decorator.js'
 import { Permission } from '../auth/permissions/permissions.enum.js';
 import { RoleScope } from '../roles/enum/role-scope.enum.js';
 import type { AuthenticatedRequest } from '../common/types/authenticated-request.type.js';
+import { CreateUserDto } from './dto/create-user.dto.js';
 
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller()
@@ -36,6 +39,17 @@ export class SystemUsersController {
     this.ensureSystemUser(req);
 
     return this.usersService.getAllUsersForSystem();
+  }
+
+  @Post('companies/:companyId/users')
+  @RequirePermissions(Permission.USERS_CREATE)
+  createCompanyUser(
+    @Param('companyId') companyId: string,
+    @Body() dto: CreateUserDto,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    this.ensureSystemUser(req);
+    return this.usersService.createUser(dto, companyId);
   }
 
   private ensureSystemUser(req: AuthenticatedRequest) {

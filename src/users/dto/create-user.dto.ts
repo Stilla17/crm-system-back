@@ -1,6 +1,7 @@
 import {
   IsEnum,
   IsNotEmpty,
+  IsNumber,
   IsOptional,
   IsString,
   Matches,
@@ -36,6 +37,10 @@ export class CreateUserDto {
   @IsNotEmpty()
   @Matches(/^\+998\d{9}$/)
   phone: string;
+
+  @IsString()
+  @IsNotEmpty()
+  date?: string;
 
   @IsEnum(UserStatus)
   @IsOptional()

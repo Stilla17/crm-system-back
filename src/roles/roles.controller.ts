@@ -1,10 +1,12 @@
 import {
   Body,
   Controller,
+  ForbiddenException,
   Get,
   Param,
   Patch,
   Post,
+  Req,
   UseGuards,
 } from '@nestjs/common';
 import { RolesService } from './roles.service.js';
@@ -13,8 +15,9 @@ import { UpdateRoleDto } from './dto/update-role.dto.js';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 import { PermissionsGuard } from '../auth/guards/permissions.guard.js';
 import { RequirePermissions } from '../auth/decorators/permissions.decorator.js';
-import { CurrentCompanyId } from '../common/decorators/current-company-id.decorator.js';
 import { Permission } from '../auth/permissions/permissions.enum.js';
+import type { AuthenticatedRequest } from '../common/types/authenticated-request.type.js';
+import { RoleScope } from './enum/role-scope.enum.js';
 
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller('roles')
@@ -23,28 +26,21 @@ export class RolesController {
 
   @Post()
   @RequirePermissions(Permission.ROLES_CREATE)
-  createRole(
-    @Body() dto: CreateRoleDto,
-    @CurrentCompanyId()
-    companyId: string,
-  ) {
-    return this.rolesService.createRole(dto, companyId);
+  createRole(@Body() dto: CreateRoleDto, @Req() req: AuthenticatedRequest) {
+    this.ensureSystemUser(req);
+    return this.rolesService.createRole(dto);
   }
 
   @Get()
   @RequirePermissions(Permission.ROLES_READ)
-  getAllRoles(@CurrentCompanyId() companyId: string) {
-    return this.rolesService.getAllRoles(companyId);
+  getAllRoles() {
+    return this.rolesService.getAllRoles();
   }
 
   @Get(':id')
   @RequirePermissions(Permission.ROLES_READ)
-  getRoleById(
-    @Param('id') id: string,
-    @CurrentCompanyId()
-    companyId: string,
-  ) {
-    return this.rolesService.getRoleById(id, companyId);
+  getRoleById(@Param('id') id: string) {
+    return this.rolesService.getRoleById(id);
   }
 
   @Patch(':id')
@@ -52,9 +48,17 @@ export class RolesController {
   updateRole(
     @Param('id') id: string,
     @Body() dto: UpdateRoleDto,
-    @CurrentCompanyId()
-    companyId: string,
+    @Req() req: AuthenticatedRequest,
   ) {
-    return this.rolesService.updateRole(id, dto, companyId);
+    this.ensureSystemUser(req);
+    return this.rolesService.updateRole(id, dto);
+  }
+
+  private ensureSystemUser(req: AuthenticatedRequest) {
+    if (req.user.roleScope !== RoleScope.SYSTEM) {
+      throw new ForbiddenException(
+        'Global rollarni faqat Super Admin boshqara oladi',
+      );
+    }
   }
 }

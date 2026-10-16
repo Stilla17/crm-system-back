@@ -46,14 +46,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('User role faol emas');
     }
 
-    if (role.scope === RoleScope.COMPANY) {
-      if (!user.companyId) {
-        throw new UnauthorizedException('Company userda companyId mavjud emas');
-      }
-
-      if (role.companyId !== user.companyId) {
-        throw new UnauthorizedException('User va role kompaniyasi mos emas');
-      }
+    if (role.scope === RoleScope.COMPANY && !user.companyId) {
+      throw new UnauthorizedException('Company userda companyId mavjud emas');
     }
 
     if (role.scope === RoleScope.SYSTEM && user.companyId !== null) {

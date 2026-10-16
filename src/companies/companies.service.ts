@@ -16,7 +16,7 @@ import { Role } from '../roles/schemas/role.schema.js';
 import { CreateCompanyAdminDto } from './dto/create-company-admin.dto.js';
 import { RoleScope } from '../roles/enum/role-scope.enum.js';
 import * as bcrypt from 'bcrypt';
-import { COMPANY_ADMIN_PERMISSIONS } from '../auth/permissions/role-permissions.js';
+import { ReplaceCompanyAdminDto } from './dto/replace-company-admin.dto.js';
 
 @Injectable()
 export class CompaniesService {
@@ -31,6 +31,20 @@ export class CompaniesService {
     private readonly userModel: Model<User>,
   ) {}
 
+  async getPublicCompanies() {
+    return this.companyModel
+      .find()
+      .select({
+        _id: 0,
+        id: 1,
+        companyName: 1,
+        brandColor: 1,
+      })
+      .sort({ companyName: 1 })
+      .lean()
+      .exec();
+  }
+
   async getAllCompanies() {
     const companies = await this.companyModel
       .find()
@@ -42,27 +56,30 @@ export class CompaniesService {
       return [];
     }
 
-    const companyIds = companies.map((company) => company.id);
-
-    // Har bir kompaniyaning Company Admin rolini topamiz
-    const adminRoles = await this.roleModel
-      .find({
-        companyId: { $in: companyIds },
-        slug: 'company-admin',
-      })
-      .select({
-        id: 1,
-        companyId: 1,
+    const companyAdminRole = await this.roleModel
+      .findOne({
+        slug: 'director',
+        scope: RoleScope.COMPANY,
+        isActive: true,
       })
       .lean()
       .exec();
 
-    const adminRoleIds = adminRoles.map((role) => role.id);
+    if (!companyAdminRole) {
+      return companies.map((company) => ({
+        ...company,
+        hasAdmin: false,
+        admin: null,
+      }));
+    }
 
-    // Shu rollarga tegishli userlarni topamiz
+    const companyIds = companies.map((company) => company.id);
+
     const admins = await this.userModel
       .find({
-        roleId: { $in: adminRoleIds },
+        companyId: { $in: companyIds },
+        roleId: companyAdminRole.id,
+        status: UserStatus.ACTIVE,
       })
       .select({
         id: 1,
@@ -77,15 +94,12 @@ export class CompaniesService {
       .lean()
       .exec();
 
-    const adminRoleByCompanyId = new Map(
-      adminRoles.map((role) => [role.companyId, role.id]),
+    const adminByCompanyId = new Map(
+      admins.map((admin) => [admin.companyId, admin]),
     );
 
-    const adminByRoleId = new Map(admins.map((admin) => [admin.roleId, admin]));
-
     return companies.map((company) => {
-      const adminRoleId = adminRoleByCompanyId.get(company.id);
-      const admin = adminRoleId ? adminByRoleId.get(adminRoleId) : undefined;
+      const admin = adminByCompanyId.get(company.id);
 
       return {
         ...company,
@@ -252,72 +266,60 @@ export class CompaniesService {
       throw new ConflictException('Bunday login bazada mavjud');
     }
 
-    const existingRole = await this.roleModel
+    const companyAdminRole = await this.roleModel
       .findOne({
-        companyId,
-        slug: 'company-admin',
+        slug: 'director',
+        scope: RoleScope.COMPANY,
+        isActive: true,
       })
       .exec();
 
-    if (existingRole) {
-      throw new ConflictException(
-        'Bu company uchun admin allaqachon yaratilgan',
+    if (!companyAdminRole) {
+      throw new NotFoundException(
+        'Global Director roli topilmadi. Seedni ishga tushiring',
       );
+    }
+
+    const existingAdmin = await this.userModel
+      .findOne({ companyId, roleId: companyAdminRole.id })
+      .exec();
+
+    if (existingAdmin) {
+      throw new ConflictException('Bu company uchun admin allaqachon mavjud');
     }
 
     const passwordHash = await bcrypt.hash(dto.password, 10);
 
-    const role = await this.roleModel.create({
+    const user = await this.userModel.create({
       companyId,
-      roleName: 'Company Admin',
-      slug: 'company-admin',
-      scope: RoleScope.COMPANY,
-      permissions: [...COMPANY_ADMIN_PERMISSIONS],
-      isActive: true,
+      roleId: companyAdminRole.id,
+      name: dto.name,
+      phone: dto.phone,
+      middleName: dto.middleName,
+      login,
+      password: passwordHash,
+      status: UserStatus.ACTIVE,
     });
 
-    try {
-      const user = await this.userModel.create({
-        companyId,
-        roleId: role.id,
-        name: dto.name,
-        phone: dto.phone,
-        middleName: dto.middleName,
-        login,
-        password: passwordHash,
-        status: UserStatus.ACTIVE,
-      });
-
-      return {
-        message: 'Company admin muvaffaqiyatli yaratildi',
-        admin: {
-          id: user.id,
-          companyId: user.companyId,
-          roleId: user.roleId,
-          name: user.name,
-          login: user.login,
-          status: user.status,
-        },
-        role: {
-          id: role.id,
-          roleName: role.roleName,
-          permissions: role.permissions,
-        },
-      };
-    } catch (error) {
-      // User yaratilmasa, yaratilgan role’ni tozalaymiz.
-      await this.roleModel
-        .findOneAndDelete({
-          id: role.id,
-          companyId,
-        })
-        .exec();
-
-      throw error;
-    }
+    return {
+      message: 'Company admin muvaffaqiyatli yaratildi',
+      admin: {
+        id: user.id,
+        companyId: user.companyId,
+        roleId: user.roleId,
+        name: user.name,
+        login: user.login,
+        status: user.status,
+      },
+      role: {
+        id: companyAdminRole.id,
+        roleName: companyAdminRole.roleName,
+        permissions: companyAdminRole.permissions,
+      },
+    };
   }
 
-  async replaceCompanyAdmin(companyId: string, dto: CreateCompanyAdminDto) {
+  async replaceCompanyAdmin(companyId: string, dto: ReplaceCompanyAdminDto) {
     const company = await this.companyModel.findOne({ id: companyId }).exec();
 
     if (!company) {
@@ -330,95 +332,63 @@ export class CompaniesService {
       );
     }
 
-    const adminRole = await this.roleModel
-      .findOne({
-        companyId,
-        slug: 'company-admin',
-      })
-      .exec();
+    const selectedUser = await this.userModel.findOne({
+      id: dto.newAdminId,
+    });
+
+    if (!selectedUser) {
+      throw new NotFoundException('Tanlangan user topilmadi');
+    }
+
+    const adminRole = await this.roleModel.findOne({
+      slug: 'director',
+      scope: RoleScope.COMPANY,
+      isActive: true,
+    });
 
     if (!adminRole) {
-      throw new NotFoundException('Company Admin roli topilmadi');
+      throw new NotFoundException(
+        'Global Director roli topilmadi. Seedni ishga tushiring',
+      );
     }
 
-    const currentAdmin = await this.userModel
-      .findOne({
-        companyId,
-        roleId: adminRole.id,
-        status: UserStatus.ACTIVE,
-      })
-      .exec();
-
-    if (!currentAdmin) {
-      throw new NotFoundException('Amaldagi Company Admin topilmadi');
-    }
-
-    const login = dto.login.toLowerCase().trim();
-
-    const existingUser = await this.userModel.findOne({ login }).exec();
-
-    if (existingUser) {
-      throw new ConflictException('Bunday login bazada mavjud');
-    }
-
-    const passwordHash = await bcrypt.hash(dto.password, 10);
-
-    const newAdmin = await this.userModel.create({
+    const currentAdmin = await this.userModel.findOne({
       companyId,
       roleId: adminRole.id,
-      name: dto.name,
-      middleName: dto.middleName,
-      phone: dto.phone,
-      login,
-      password: passwordHash,
       status: UserStatus.ACTIVE,
     });
 
-    try {
-      await this.userModel
-        .findOneAndUpdate(
-          {
-            id: currentAdmin.id,
-            companyId,
-          },
-          {
-            $set: {
-              status: UserStatus.INACTIVE,
-              refreshToken: null,
-            },
-          },
-        )
-        .exec();
-    } catch (error) {
-      // Eski adminni o‘chirishda xato bo‘lsa,
-      // yangi yaratilgan adminni tozalaymiz.
-      await this.userModel
-        .findOneAndDelete({
-          id: newAdmin.id,
-          companyId,
-        })
-        .exec();
-
-      throw error;
+    if (currentAdmin?.id === selectedUser.id) {
+      throw new BadRequestException(
+        'Tanlangan user hozir ham kompaniya rahbari',
+      );
     }
 
+    if (currentAdmin) {
+      await this.userModel.findOneAndUpdate(
+        { id: currentAdmin.id, companyId },
+        {
+          $set: {
+            status: UserStatus.INACTIVE,
+            refreshToken: null,
+          },
+        },
+      );
+    }
+
+    await this.userModel.findOneAndUpdate(
+      { id: selectedUser.id },
+      {
+        $set: {
+          companyId,
+          roleId: adminRole.id,
+          status: UserStatus.ACTIVE,
+        },
+      },
+    );
+
     return {
-      message: 'Company admin muvaffaqiyatli almashtirildi',
-      previousAdmin: {
-        id: currentAdmin.id,
-        name: currentAdmin.name,
-        status: UserStatus.INACTIVE,
-      },
-      admin: {
-        id: newAdmin.id,
-        companyId: newAdmin.companyId,
-        roleId: newAdmin.roleId,
-        name: newAdmin.name,
-        middleName: newAdmin.middleName,
-        phone: newAdmin.phone,
-        login: newAdmin.login,
-        status: newAdmin.status,
-      },
+      message: 'Kompaniya rahbari muvaffaqiyatli almashtirildi',
     };
   }
 }

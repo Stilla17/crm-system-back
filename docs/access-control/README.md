@@ -9,13 +9,12 @@ Tizim RBAC (Role-Based Access Control) asosida ishlaydi:
 ```text
 User ── roleId ──> Role ──> permissions[]
   │                   │
-  └── companyId       ├── companyId
-                      └── scope: system | company
+  └── companyId       └── scope: system | company
 ```
 
 - `User` permissionlarni bevosita saqlamaydi; ular userga biriktirilgan `Role`dan olinadi.
-- `system` scope’dagi role global boshqaruv uchun ishlatiladi va kompaniyaga tegishli emas.
-- `company` scope’dagi role faqat o‘z kompaniyasi doirasida ishlaydi.
+- Barcha role’lar global: bitta role turli kompaniyalardagi userlarga biriktirilishi mumkin.
+- `company` scope’dagi user qaysi tenantga tegishli ekanini `User.companyId` belgilaydi.
 - Himoyalangan har bir requestda user va role bazadan qayta o‘qiladi. Shu sababli role permissionlari yoki faolligi o‘zgarsa, o‘zgarish amaldagi access token tugashini kutmasdan qo‘llanadi.
 
 ## 2. Ma’lumotlar modeli
@@ -25,7 +24,6 @@ User ── roleId ──> Role ──> permissions[]
 ```ts
 interface Role {
   id: string;
-  companyId?: string | null;
   roleName: string;
   scope: 'system' | 'company';
   slug: string;
@@ -38,11 +36,11 @@ interface Role {
 
 Muhim qoidalar:
 
-- `system` role uchun `companyId: null` bo‘ladi.
 - API orqali yaratilgan role har doim `scope: 'company'` bo‘ladi.
-- `{ companyId, slug }` juftligi unique.
+- `slug` barcha role’lar bo‘yicha global unique.
 - `slug` kichik harflarga o‘tkazilib, ikki chetidagi bo‘sh joylar olib tashlanadi.
 - Company role’ga `companies.create` va `companies.delete` permissionlarini berish taqiqlangan.
+- Global role yaratish va yangilash faqat system userga ruxsat etiladi.
 
 ### User
 
@@ -62,7 +60,7 @@ interface User {
 ```
 
 - System user uchun `companyId: null` bo‘ladi.
-- Company user o‘z kompaniyasidagi role’ga biriktirilishi kerak.
+- Company user faqat faol `company` scope’dagi global role’ga biriktirilishi mumkin.
 - `login` global unique va kichik harflarda saqlanadi.
 - Parol va refresh token bazada bcrypt hash ko‘rinishida saqlanadi hamda oddiy query natijasiga kiritilmaydi.
 
@@ -133,7 +131,7 @@ fetch(url, {
   "login": "admin",
   "companyId": "company-uuid",
   "roleId": "role-uuid",
-  "roleName": "Company Admin",
+  "roleName": "Director",
   "roleScope": "company",
   "permissions": ["users.read", "roles.read"]
 }
@@ -175,7 +173,7 @@ Tekshiruvlar:
 1. Token ichidagi `sub` bo‘yicha user topiladi.
 2. User `active` ekanligi tekshiriladi.
 3. `roleId` bo‘yicha role topiladi va `isActive` tekshiriladi.
-4. Company role bo‘lsa, user va role `companyId` qiymatlari bir xil bo‘lishi shart.
+4. Company role bo‘lsa, userda `companyId` mavjud bo‘lishi shart.
 5. System role bo‘lsa, userning `companyId` qiymati `null` bo‘lishi shart.
 6. Endpoint talab qilgan barcha permissionlar user role’ida mavjudligi tekshiriladi.
 
@@ -209,7 +207,7 @@ findOneAndUpdate({ id, companyId }, update);
 findOneAndDelete({ id, companyId });
 ```
 
-Natijada company user boshqa kompaniyaning `id` qiymatini bilsa ham uning role yoki user ma’lumotiga kira olmaydi. `@CurrentCompanyId()` system userda kompaniya yo‘qligi sababli `403 Forbidden` qaytaradi; shu bois `/roles` va `/users` company-context endpointlaridir.
+Natijada company user boshqa kompaniyaning `id` qiymatini bilsa ham uning user yoki biznes ma’lumotiga kira olmaydi. Role’lar global bo‘lgani uchun `/roles` company kontekstini talab qilmaydi; `/users` va boshqa tenant resurslari esa `@CurrentCompanyId()` bilan cheklanadi.
 
 ## 6. Permissionlar
 
@@ -232,21 +230,21 @@ Eslatma: permission enum’da mavjud bo‘lishi endpoint implementatsiya qilinga
 ### Standart role to‘plamlari
 
 - `SUPER_ADMIN_PERMISSIONS` — barcha permissionlar.
-- `COMPANY_ADMIN_PERMISSIONS` — role, user, customer, book, shipment va payment boshqaruvi; `roles.delete` kiritilmagan.
+- `DIRECTOR_PERMISSIONS` — global role’larni o‘qish hamda user, customer, book, shipment va payment boshqaruvi. Global role yaratish/yangilash kiritilmagan.
 - `MANAGER_PERMISSIONS` — customer yaratish/o‘qish/yangilash, book o‘qish, shipment yaratish/o‘qish/yangilash va payment o‘qish.
 
 Bu to‘plamlar `src/auth/permissions/role-permissions.ts` faylida joylashgan.
 
 ## 7. Role endpointlari
 
-Barcha role endpointlari access token, permission va company kontekstini talab qiladi.
+Barcha role endpointlari access token va permission talab qiladi. Role’lar global bo‘lgani uchun company konteksti ishlatilmaydi.
 
-| Method  | Endpoint            | Permission     | Vazifasi                                |
-| ------- | ------------------- | -------------- | --------------------------------------- |
-| `POST`  | `/api/v1/roles`     | `roles.create` | Company role yaratadi                   |
-| `GET`   | `/api/v1/roles`     | `roles.read`   | Joriy kompaniya role’larini oladi       |
-| `GET`   | `/api/v1/roles/:id` | `roles.read`   | Joriy kompaniyadagi bitta role’ni oladi |
-| `PATCH` | `/api/v1/roles/:id` | `roles.update` | Joriy kompaniyadagi role’ni yangilaydi  |
+| Method  | Endpoint            | Permission     | Vazifasi                                   |
+| ------- | ------------------- | -------------- | ------------------------------------------ |
+| `POST`  | `/api/v1/roles`     | `roles.create` | Global company role yaratadi (system)      |
+| `GET`   | `/api/v1/roles`     | `roles.read`   | Global company role’larini oladi           |
+| `GET`   | `/api/v1/roles/:id` | `roles.read`   | Bitta global company role’ni oladi         |
+| `PATCH` | `/api/v1/roles/:id` | `roles.update` | Global company role’ni yangilaydi (system) |
 
 Role yaratish:
 
@@ -259,9 +257,9 @@ Role yaratish:
 }
 ```
 
-`companyId` va `scope` client tomonidan yuborilmaydi. Global validation noma’lum maydonlarni rad etadi; backend ularni mos ravishda joriy kompaniya ID’si va `company` qiymati bilan belgilaydi.
+`companyId` role modelida mavjud emas va `scope` client tomonidan yuborilmaydi. Backend API orqali yaratilgan role’ga `company` scope beradi.
 
-Inactive role’ga user biriktirishga joriy implementatsiyada ruxsat beriladi, ammo shu user himoyalangan endpointga murojaat qilganda `401 Unauthorized` oladi.
+Inactive role’ga user biriktirish taqiqlanadi. Avval biriktirilgan role nofaol qilinsa, user himoyalangan endpointda `401 Unauthorized` oladi.
 
 ## 8. User endpointlari
 
@@ -328,11 +326,17 @@ SUPER_ADMIN_NAME=...
 
 Seed quyidagilarni yaratadi:
 
-- `scope: 'system'`, `companyId: null` bo‘lgan `super-admin` role;
-- barcha mavjud permissionlar;
+- `scope: 'system'` bo‘lgan global `super-admin` role;
+- `scope: 'company'` bo‘lgan global `director` role;
+- role’lar uchun tegishli permissionlar;
 - `companyId: null` bo‘lgan active super admin user.
 
 Seed qayta ishga tushirilganda mavjud role yoki user takroran yaratilmaydi.
+
+Eski per-company role ma’lumotlarini global modelga bir marta o‘tkazish uchun
+`scripts/migrate-global-roles.js` mongosh skripti mavjud. U bir xil role’larning
+sozlamalari farq qilsa migratsiyani to‘xtatadi, aks holda backup kolleksiyalar
+yaratib, userlarning `roleId` qiymatlarini canonical global role’ga ko‘chiradi.
 
 ## 11. HTTP statuslar
 
@@ -352,7 +356,7 @@ Seed qayta ishga tushirilganda mavjud role yoki user takroran yaratilmaydi.
 - Refresh oqimi saqlangan token hashini tekshiradi, ammo user statusi, role faolligi va role scope mosligini qayta tekshirmaydi.
 - CORS origin hozir kodda `http://localhost:3000` sifatida belgilangan.
 - Cookie `sameSite=lax`; frontend va backend turli site’larda joylashsa, production cookie/CORS konfiguratsiyasini moslashtirish kerak.
-- Company o‘chirilganda unga tegishli role va userlar avtomatik o‘chirilmaydi.
+- Company o‘chirilganda unga tegishli userlar avtomatik o‘chirilmaydi; global role’lar kompaniyaga tegishli emas.
 - Role o‘chirish endpointi implementatsiya qilinmagan.
 - User yaratish service’i qaytargan yangi document alohida sanitizatsiya qilinmagan; parol hashini response’dan chiqarish lozim.
 

@@ -21,14 +21,6 @@ export class Role {
 
   @Prop({
     type: String,
-    required: false,
-    default: null,
-    index: true,
-  })
-  companyId?: string | null;
-
-  @Prop({
-    type: String,
     required: true,
     trim: true,
   })
@@ -46,6 +38,7 @@ export class Role {
     required: true,
     trim: true,
     lowercase: true,
+    unique: true,
   })
   slug: string;
 
@@ -62,10 +55,7 @@ export class Role {
   isActive: boolean;
 
   createdAt: Date;
-
   updatedAt: Date;
 }
 
 export const RoleSchema = SchemaFactory.createForClass(Role);
-
-RoleSchema.index({ companyId: 1, slug: 1 }, { unique: true });

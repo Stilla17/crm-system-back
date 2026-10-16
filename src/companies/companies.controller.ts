@@ -20,6 +20,8 @@ import { Permission } from '../auth/permissions/permissions.enum.js';
 import type { AuthenticatedRequest } from '../common/types/authenticated-request.type.js';
 import { RoleScope } from '../roles/enum/role-scope.enum.js';
 import { CreateCompanyAdminDto } from './dto/create-company-admin.dto.js';
+import { ReplaceCompanyAdminDto } from './dto/replace-company-admin.dto.js';
+import { Public } from '../auth/decorators/public.decorator.js';
 
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller('companies')
@@ -30,6 +32,12 @@ export class CompaniesController {
   @RequirePermissions(Permission.COMPANIES_READ)
   getAllCompanies() {
     return this.companyService.getAllCompanies();
+  }
+
+  @Get('public')
+  @Public()
+  getPublicCompanies() {
+    return this.companyService.getPublicCompanies();
   }
 
   @Get(':id')
@@ -106,7 +114,7 @@ export class CompaniesController {
   @RequirePermissions(Permission.COMPANIES_UPDATE)
   replaceCompanyAdmin(
     @Param('id') companyId: string,
-    @Body() dto: CreateCompanyAdminDto,
+    @Body() dto: ReplaceCompanyAdminDto,
     @Req() req: AuthenticatedRequest,
   ) {
     if (req.user.roleScope !== RoleScope.SYSTEM) {

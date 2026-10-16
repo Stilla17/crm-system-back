@@ -21,7 +21,7 @@ import { RolesModule } from '../roles/roles.module.js';
       useFactory: (configService: ConfigService) => ({
         secret: configService.getOrThrow<string>('JWT_ACCESS_SECRET'),
         signOptions: {
-          expiresIn: '15m',
+          expiresIn: '3h',
         },
       }),
     }),
