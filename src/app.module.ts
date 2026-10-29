@@ -13,6 +13,8 @@ import { PaymentsModule } from './payments/payments.module.js';
 import { RolesModule } from './roles/roles.module.js';
 import { SeedModule } from './database/seeds/seed.module.js';
 import { getMongoConnectionUri } from './config/mongodb-uri.js';
+import { VerifixModule } from './verifix/verifix.module.js';
+import { EmployeesModule } from './employees/employees.module.js';
 
 @Module({
   imports: [
@@ -38,6 +40,8 @@ import { getMongoConnectionUri } from './config/mongodb-uri.js';
     PaymentsModule,
     RolesModule,
     SeedModule,
+    VerifixModule,
+    EmployeesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

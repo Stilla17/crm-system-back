@@ -49,7 +49,9 @@ export class RolesService {
       });
     } catch (error: unknown) {
       if (isMongoDuplicateKeyError(error)) {
-        throw new ConflictException('Bunday rol mavjud');
+        throw new ConflictException(
+          'Bunday slug mavjud yoki kompaniya admin roli oldin belgilangan',
+        );
       }
 
       throw error;
@@ -113,7 +115,9 @@ export class RolesService {
       return role;
     } catch (error: unknown) {
       if (isMongoDuplicateKeyError(error)) {
-        throw new ConflictException('Bunday rol mavjud');
+        throw new ConflictException(
+          'Bunday slug mavjud yoki kompaniya admin roli oldin belgilangan',
+        );
       }
 
       throw error;

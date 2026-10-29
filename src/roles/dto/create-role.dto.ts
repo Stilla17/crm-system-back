@@ -26,5 +26,9 @@ export class CreateRoleDto {
 
   @IsBoolean()
   @IsOptional()
+  isCompanyAdmin?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
   isActive?: boolean;
 }

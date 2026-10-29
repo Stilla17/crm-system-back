@@ -26,12 +26,14 @@ export class AuthController {
     @Body() dto: LoginDto,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const tokens = await this.authService.login(dto);
+    const result = await this.authService.login(dto);
 
-    setAuthCookies(res, tokens);
+    setAuthCookies(res, result.tokens);
 
     return {
       message: 'Tizimga muvaffaqiyatli kirildi',
+      company: result.company,
+      employee: result.employee,
     };
   }
 

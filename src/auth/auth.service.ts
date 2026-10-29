@@ -1,10 +1,16 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { UsersService } from '../users/users.service.js';
 import { JwtService } from '@nestjs/jwt';
 import { LoginDto } from './dto/login.dto.js';
 import * as bcrypt from 'bcrypt';
 import { RolesService } from '../roles/roles.service.js';
 import { RoleScope } from '../roles/enum/role-scope.enum.js';
+import { CompaniesService } from '../companies/companies.service.js';
+import { UserStatus } from '../users/schemas/user.schema.js';
 
 @Injectable()
 export class AuthService {
@@ -12,6 +18,7 @@ export class AuthService {
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
     private readonly rolesService: RolesService,
+    private readonly companiesService: CompaniesService,
   ) {}
 
   // Ikkala tokkenni olib yasab berish uchun method
@@ -57,16 +64,38 @@ export class AuthService {
   // Login
   async login(dto: LoginDto) {
     const login = dto.login.toLowerCase().trim();
+    const invalidCredentialsMessage = "Login, parol yoki kompaniya noto'g'ri";
+    const company = dto.companyId
+      ? await this.companiesService.findActiveCompanyById(dto.companyId)
+      : null;
+
+    if (dto.companyId && !company) {
+      throw new UnauthorizedException(invalidCredentialsMessage);
+    }
+
     const user = await this.usersService.findByLogin(login);
 
-    if (!user) {
-      throw new UnauthorizedException('Bunday user mavjud emas');
+    if (!user || user.status !== UserStatus.ACTIVE) {
+      throw new UnauthorizedException(invalidCredentialsMessage);
     }
 
     const isPassword = await bcrypt.compare(dto.password, user.password);
 
     if (!isPassword) {
-      throw new UnauthorizedException("Login yoki parol noto'g'ri");
+      throw new UnauthorizedException(invalidCredentialsMessage);
+    }
+
+    const role = await this.rolesService.findRoleForAuth(user.roleId);
+
+    if (!role || !role.isActive) {
+      throw new UnauthorizedException('User role faol emas yoki topilmadi');
+    }
+
+    if (
+      role.scope !== RoleScope.SYSTEM &&
+      String(user.companyId) !== String(dto.companyId)
+    ) {
+      throw new ForbiddenException('Siz tanlangan kompaniya xodimi emassiz');
     }
 
     const tokens = await this.getTokens(
@@ -81,8 +110,22 @@ export class AuthService {
       tokens.refreshToken,
     );
 
-    return tokens;
+    return {
+      tokens,
+      company,
+      employee: {
+        id: user.id,
+        companyId: user.companyId,
+        roleId: user.roleId,
+        name: user.name,
+        middleName: user.middleName,
+        login: user.login,
+        phone: user.phone,
+        status: user.status,
+      },
+    };
   }
+
   // Refresh (Yangi acces token olish)
   async refreshTokens(userId: string, refreshToken: string) {
     const user = await this.usersService.getUserByIdWithRefreshToken(userId);

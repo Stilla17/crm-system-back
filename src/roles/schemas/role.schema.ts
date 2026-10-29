@@ -50,6 +50,12 @@ export class Role {
 
   @Prop({
     type: Boolean,
+    default: false,
+  })
+  isCompanyAdmin: boolean;
+
+  @Prop({
+    type: Boolean,
     default: true,
   })
   isActive: boolean;
@@ -59,3 +65,13 @@ export class Role {
 }
 
 export const RoleSchema = SchemaFactory.createForClass(Role);
+RoleSchema.index(
+  { scope: 1, isCompanyAdmin: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      scope: RoleScope.COMPANY,
+      isCompanyAdmin: true,
+    },
+  },
+);

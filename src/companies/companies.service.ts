@@ -31,9 +31,25 @@ export class CompaniesService {
     private readonly userModel: Model<User>,
   ) {}
 
+  private async getCompanyAdminRole() {
+    const role = await this.roleModel
+      .findOne({
+        scope: RoleScope.COMPANY,
+        isCompanyAdmin: true,
+        isActive: true,
+      })
+      .exec();
+
+    if (!role) {
+      throw new NotFoundException('Kompaniya admin roli yaratilmagan');
+    }
+
+    return role;
+  }
+
   async getPublicCompanies() {
     return this.companyModel
-      .find()
+      .find({ isActive: true })
       .select({
         _id: 0,
         id: 1,
@@ -58,8 +74,8 @@ export class CompaniesService {
 
     const companyAdminRole = await this.roleModel
       .findOne({
-        slug: 'director',
         scope: RoleScope.COMPANY,
+        isCompanyAdmin: true,
         isActive: true,
       })
       .lean()
@@ -266,19 +282,7 @@ export class CompaniesService {
       throw new ConflictException('Bunday login bazada mavjud');
     }
 
-    const companyAdminRole = await this.roleModel
-      .findOne({
-        slug: 'director',
-        scope: RoleScope.COMPANY,
-        isActive: true,
-      })
-      .exec();
-
-    if (!companyAdminRole) {
-      throw new NotFoundException(
-        'Global Director roli topilmadi. Seedni ishga tushiring',
-      );
-    }
+    const companyAdminRole = await this.getCompanyAdminRole();
 
     const existingAdmin = await this.userModel
       .findOne({ companyId, roleId: companyAdminRole.id })
@@ -340,17 +344,7 @@ export class CompaniesService {
       throw new NotFoundException('Tanlangan user topilmadi');
     }
 
-    const adminRole = await this.roleModel.findOne({
-      slug: 'director',
-      scope: RoleScope.COMPANY,
-      isActive: true,
-    });
-
-    if (!adminRole) {
-      throw new NotFoundException(
-        'Global Director roli topilmadi. Seedni ishga tushiring',
-      );
-    }
+    const adminRole = await this.getCompanyAdminRole();
 
     const currentAdmin = await this.userModel.findOne({
       companyId,
@@ -390,5 +384,20 @@ export class CompaniesService {
     return {
       message: 'Kompaniya rahbari muvaffaqiyatli almashtirildi',
     };
+  }
+
+  async findActiveCompanyById(id: string) {
+    return this.companyModel
+      .findOne({ id, isActive: true })
+      .select({
+        _id: 0,
+        id: 1,
+        companyName: 1,
+        brandColor: 1,
+        slug: 1,
+        type: 1,
+      })
+      .lean()
+      .exec();
   }
 }

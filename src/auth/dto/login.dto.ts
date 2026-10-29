@@ -1,6 +1,16 @@
-import { IsNotEmpty, IsString, MinLength } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MinLength,
+} from 'class-validator';
 
 export class LoginDto {
+  @IsOptional()
+  @IsUUID()
+  companyId?: string;
+
   @IsString()
   @IsNotEmpty()
   login: string;

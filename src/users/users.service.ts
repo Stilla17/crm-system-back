@@ -10,6 +10,7 @@ import { CreateUserDto } from './dto/create-user.dto.js';
 import * as bcrypt from 'bcrypt';
 import { UpdateUserDto } from './dto/update-user.dto.js';
 import { RolesService } from '../roles/roles.service.js';
+import type { ClientSession } from 'mongoose';
 
 @Injectable()
 export class UsersService {
@@ -97,6 +98,55 @@ export class UsersService {
 
     if (!user) {
       throw new NotFoundException('User topilmadi');
+    }
+
+    return user;
+  }
+
+  async updateEmployeeProfile(
+    id: string,
+    companyId: string,
+    profile: {
+      name: string;
+      middleName: string;
+      phone?: string | null;
+      date?: string | null;
+      roleId?: string;
+    },
+  ) {
+    if (profile.roleId) {
+      await this.rolesService.getAssignableRoleById(profile.roleId);
+    }
+
+    return this.userModel.findOneAndUpdate(
+      { id, companyId },
+      {
+        $set: {
+          name: profile.name,
+          middleName: profile.middleName,
+          ...(profile.phone ? { phone: profile.phone } : {}),
+          ...(profile.date ? { date: profile.date } : {}),
+          ...(profile.roleId ? { roleId: profile.roleId } : {}),
+        },
+      },
+      { new: true },
+    );
+  }
+
+  async moveUserToCompany(
+    id: string,
+    sourceCompanyId: string,
+    targetCompanyId: string,
+    session?: ClientSession,
+  ) {
+    const user = await this.userModel.findOneAndUpdate(
+      { id, companyId: sourceCompanyId },
+      { $set: { companyId: targetCompanyId } },
+      { new: true, runValidators: true, session },
+    );
+
+    if (!user) {
+      throw new NotFoundException('Xodimga bog‘langan CRM user topilmadi');
     }
 
     return user;
