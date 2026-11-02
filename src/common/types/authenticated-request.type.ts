@@ -8,6 +8,7 @@ export interface AuthenticatedRequest extends Request {
     roleId: string;
     permissions: string[];
     roleName: string;
-    roleScope: RoleScope
+    roleScope: RoleScope;
+    allowedSections: string[];
   };
 }

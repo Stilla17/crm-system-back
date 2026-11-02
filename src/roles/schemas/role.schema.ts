@@ -49,6 +49,12 @@ export class Role {
   permissions: Permission[];
 
   @Prop({
+    type: [String],
+    default: [],
+  })
+  allowedSections: string[];
+
+  @Prop({
     type: Boolean,
     default: false,
   })

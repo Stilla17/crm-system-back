@@ -17,8 +17,11 @@ import { Permission } from '../auth/permissions/permissions.enum.js';
 import { CurrentCompanyId } from '../common/decorators/current-company-id.decorator.js';
 import { UpdateEmployeeDto } from './dto/update-employee.dto.js';
 import { EmployeeListQueryDto } from './dto/employee-list-query.dto.js';
+import { SectionGuard } from '../auth/guards/section.guard.js';
+import { RequireSection } from '../auth/decorators/section.decarator.js';
 
-@UseGuards(JwtAuthGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, SectionGuard, PermissionsGuard)
+@RequireSection('hr')
 @Controller('employees')
 export class EmployeesController {
   constructor(private readonly employeesService: EmployeesService) {}

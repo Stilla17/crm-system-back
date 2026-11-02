@@ -122,6 +122,7 @@ export class AuthService {
         login: user.login,
         phone: user.phone,
         status: user.status,
+        allowedSections: role.allowedSections ?? [],
       },
     };
   }

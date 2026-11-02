@@ -64,6 +64,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       roleName: role.roleName,
       roleScope: role.scope,
       permissions: role.permissions,
+      allowedSections: role.allowedSections ?? [],
     };
   }
 }

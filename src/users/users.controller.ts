@@ -17,8 +17,11 @@ import { PermissionsGuard } from '../auth/guards/permissions.guard.js';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 import { CurrentCompanyId } from '../common/decorators/current-company-id.decorator.js';
 import { Permission } from '../auth/permissions/permissions.enum.js';
+import { SectionGuard } from '../auth/guards/section.guard.js';
+import { RequireSection } from '../auth/decorators/section.decarator.js';
 
-@UseGuards(JwtAuthGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, SectionGuard, PermissionsGuard)
+@RequireSection('hr')
 @Controller('users')
 export class UsersController {
   constructor(private readonly userService: UsersService) {}

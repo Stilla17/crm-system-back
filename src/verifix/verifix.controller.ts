@@ -2,8 +2,9 @@ import { Body, Controller, Post, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 import { VerifixListDto } from './dto/verifix-list.dto.js';
 import { VerifixService } from './verifix.service.js';
+import { SystemOnlyGuard } from '../auth/guards/system-only.guard.js';
 
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, SystemOnlyGuard)
 @Controller('verifix')
 export class VerifixController {
   constructor(private readonly verifixService: VerifixService) {}

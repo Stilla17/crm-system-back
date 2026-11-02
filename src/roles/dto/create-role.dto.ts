@@ -6,6 +6,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  Matches,
 } from 'class-validator';
 import { Permission } from '../../auth/permissions/permissions.enum.js';
 
@@ -27,6 +28,13 @@ export class CreateRoleDto {
   @IsBoolean()
   @IsOptional()
   isCompanyAdmin?: boolean;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayUnique()
+  @IsString({ each: true })
+  @Matches(/^[a-z][a-z0-9-]*$/, { each: true })
+  allowedSections?: string[];
 
   @IsBoolean()
   @IsOptional()
