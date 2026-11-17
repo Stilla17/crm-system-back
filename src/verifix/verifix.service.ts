@@ -12,6 +12,11 @@ import {
   VerifixEmployeeListResponse,
   UpdateVerifixEmployee,
 } from './types/verifix-employee.type.js';
+import {
+  VerifixTrack,
+  VerifixTrackListResponse,
+} from './types/verifix-track.type.js';
+import { VerifixPaymentsByTimeResponse } from './types/verifix-payment.type.js';
 
 interface VerifixTokenResponse {
   access_token: string;
@@ -22,6 +27,7 @@ interface VerifixTokenResponse {
 interface VerifixRequestOptions {
   cursor?: string;
   limit?: number;
+  timeoutMs?: number;
 }
 
 type VerifixScope = 'read' | 'write';
@@ -94,10 +100,74 @@ export class VerifixService {
 
   // Xodimlarni kelish ketishi
   listTracks(dto: VerifixListDto) {
-    return this.request(
+    return this.request<VerifixTrackListResponse>(
       '/b/vhr/api/v1/core/track$list',
       dto.filters ?? {},
       dto,
+    );
+  }
+
+  async listEmployeeTracks(
+    employeeId: string,
+    beginDateTime: string,
+    endDateTime: string,
+  ): Promise<VerifixTrack[]> {
+    const tracks: VerifixTrack[] = [];
+    const seenCursors = new Set<string>();
+    let cursor: string | undefined;
+
+    for (let page = 0; page < 1_000; page += 1) {
+      const response = await this.listTracks({
+        cursor,
+        limit: 500,
+        filters: {
+          employee_ids: [employeeId],
+          begin_datetime: beginDateTime,
+          end_datetime: endDateTime,
+        },
+      });
+
+      if (!response || !Array.isArray(response.data)) {
+        throw new BadGatewayException(
+          'Verifix davomat ma\u2018lumotlari noto\u2018g\u2018ri formatda qaytdi',
+        );
+      }
+
+      tracks.push(...response.data);
+
+      const nextCursor = String(response.meta?.next_cursor ?? '').trim();
+
+      if (
+        response.data.length === 0 ||
+        !nextCursor ||
+        nextCursor === '-1' ||
+        seenCursors.has(nextCursor)
+      ) {
+        return tracks;
+      }
+
+      seenCursors.add(nextCursor);
+      cursor = nextCursor;
+    }
+
+    throw new BadGatewayException(
+      'Verifix davomat pagination chegarasidan oshib ketdi',
+    );
+  }
+
+  getEmployeePaymentsByTime(
+    employeeId: string,
+    beginDate: string,
+    endDate: string,
+  ) {
+    return this.request<VerifixPaymentsByTimeResponse>(
+      '/b/vhr/api/v1/rep/payments_by_time$list',
+      {
+        begin_date: beginDate,
+        end_date: endDate,
+        employee_ids: [employeeId],
+      },
+      { timeoutMs: 90_000 },
     );
   }
 
@@ -254,7 +324,7 @@ export class VerifixService {
         method: 'POST',
         headers,
         body: JSON.stringify(body),
-        signal: AbortSignal.timeout(30_000),
+        signal: AbortSignal.timeout(options.timeoutMs ?? 30_000),
       });
     } catch {
       throw new ServiceUnavailableException(

@@ -15,6 +15,7 @@ import { SeedModule } from './database/seeds/seed.module.js';
 import { getMongoConnectionUri } from './config/mongodb-uri.js';
 import { VerifixModule } from './verifix/verifix.module.js';
 import { EmployeesModule } from './employees/employees.module.js';
+import { SalesModule } from './sales/sales.module.js';
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { EmployeesModule } from './employees/employees.module.js';
     RolesModule,
     SeedModule,
     VerifixModule,
+    SalesModule,
     EmployeesModule,
   ],
   controllers: [AppController],

@@ -40,4 +40,7 @@ export enum Permission {
   PAYMENTS_CREATE = 'payments.create',
   PAYMENTS_UPDATE = 'payments.update',
   PAYMENTS_DELETE = 'payments.delete',
+
+  // Sales
+  SALES_READ = 'sales.read',
 }

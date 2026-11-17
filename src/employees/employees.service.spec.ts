@@ -33,6 +33,8 @@ describe('EmployeesService', () => {
   const verifixServiceMock = {
     createEmployee: vi.fn(),
     listAllEmployees: vi.fn(),
+    listEmployeeTracks: vi.fn(),
+    getEmployeePaymentsByTime: vi.fn(),
     updateEmployee: vi.fn(),
   };
 
@@ -70,6 +72,154 @@ describe('EmployeesService', () => {
 
   it('should be defined', () => {
     expect(service).toBeDefined();
+  });
+
+  it('should return daily attendance from Verifix tracks', async () => {
+    employeeModelMock.findOne.mockResolvedValue({
+      id: 'employee-id',
+      companyId: 'company-id',
+      verifixEmployeeId: '42',
+    });
+    verifixServiceMock.listEmployeeTracks.mockResolvedValue([
+      {
+        track_id: '1',
+        employee_id: '42',
+        track_type: 'I',
+        track_datetime: '03.11.2026 09:07:00',
+      },
+      {
+        track_id: '2',
+        employee_id: '42',
+        track_type: 'C',
+        track_datetime: '03.11.2026 13:00:00',
+      },
+      {
+        track_id: '3',
+        employee_id: '42',
+        track_type: 'O',
+        track_datetime: '03.11.2026 18:12:00',
+      },
+    ]);
+
+    const result = await service.getAttendance(
+      'employee-id',
+      'company-id',
+      { from: '2026-11-01', to: '2026-11-30' },
+    );
+
+    expect(verifixServiceMock.listEmployeeTracks).toHaveBeenCalledWith(
+      '42',
+      '01.11.2026 00:00:00',
+      '30.11.2026 23:59:59',
+    );
+    expect(result).toEqual({
+      period: { from: '2026-11-01', to: '2026-11-30' },
+      summary: {
+        recordedDays: 1,
+        daysWithCheckIn: 1,
+        totalTrackEvents: 3,
+      },
+      items: [
+        {
+          date: '2026-11-03',
+          checkInAt: '2026-11-03T09:07:00+05:00',
+          checkOutAt: '2026-11-03T18:12:00+05:00',
+          trackCount: 3,
+        },
+      ],
+    });
+  });
+
+  it('should return normalized salary data from Verifix', async () => {
+    employeeModelMock.findOne.mockResolvedValue({
+      id: 'employee-id',
+      companyId: 'company-id',
+      verifixEmployeeId: '42',
+    });
+    verifixServiceMock.getEmployeePaymentsByTime.mockResolvedValue({
+      employees: [
+        {
+          employee_id: '42',
+          staff_id: '84',
+          employee_name: 'Hidden from CRM response',
+          days: [
+            {
+              job_id: '7',
+              date: '03.11.2026',
+              plan_time_seconds: '28800',
+              day_kind: 'W',
+              day_kind_name: 'Ish kuni',
+              wage: '125000',
+              intervals: [
+                {
+                  input_id: '1',
+                  input_location_id: '10',
+                  input_location_name: 'Office',
+                  input_time: '09:00:00',
+                  output_id: '2',
+                  output_location_id: '10',
+                  output_location_name: 'Office',
+                  output_time: '18:00:00',
+                  turnout_time: '28800',
+                  wage_amount: '120000',
+                  overtime_time: '3600',
+                  overtime_amount: '5000',
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+
+    const result = await service.getSalary('employee-id', 'company-id', {
+      from: '2026-11-01',
+      to: '2026-11-30',
+    });
+
+    expect(verifixServiceMock.getEmployeePaymentsByTime).toHaveBeenCalledWith(
+      '42',
+      '01.11.2026',
+      '30.11.2026',
+    );
+    expect(result).toEqual({
+      period: { from: '2026-11-01', to: '2026-11-30' },
+      staffId: '84',
+      summary: {
+        totalWage: 125000,
+        plannedTimeSeconds: 28800,
+        turnoutTimeSeconds: 28800,
+        overtimeTimeSeconds: 3600,
+        overtimeAmount: 5000,
+        workedDays: 1,
+      },
+      days: [
+        {
+          date: '2026-11-03',
+          jobId: '7',
+          planTimeSeconds: 28800,
+          dayKind: 'W',
+          dayKindName: 'Ish kuni',
+          wage: 125000,
+          intervals: [
+            {
+              inputId: '1',
+              inputLocationId: '10',
+              inputLocationName: 'Office',
+              inputTime: '09:00:00',
+              outputId: '2',
+              outputLocationId: '10',
+              outputLocationName: 'Office',
+              outputTime: '18:00:00',
+              turnoutTimeSeconds: 28800,
+              wageAmount: 120000,
+              overtimeTimeSeconds: 3600,
+              overtimeAmount: 5000,
+            },
+          ],
+        },
+      ],
+    });
   });
 
   it('should sync a pending employee to Verifix', async () => {

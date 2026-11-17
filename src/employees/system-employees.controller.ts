@@ -20,6 +20,8 @@ import { EmployeesService } from './employees.service.js';
 import { UpdateEmployeeDto } from './dto/update-employee.dto.js';
 import { MoveEmployeeCompanyDto } from './dto/move-employee-company.dto.js';
 import { EmployeeListQueryDto } from './dto/employee-list-query.dto.js';
+import { EmployeeAttendanceQueryDto } from './dto/employee-attendance-query.dto.js';
+import { EmployeeSalaryQueryDto } from './dto/employee-salary-query.dto.js';
 
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller()
@@ -47,6 +49,30 @@ export class SystemEmployeesController {
   ) {
     this.ensureSystemUser(req);
     return this.employeesService.getDetails(employeeId, companyId);
+  }
+
+  @Get('companies/:companyId/employees/:employeeId/attendance')
+  @RequirePermissions(Permission.USERS_READ)
+  getCompanyEmployeeAttendance(
+    @Param('companyId') companyId: string,
+    @Param('employeeId') employeeId: string,
+    @Query() query: EmployeeAttendanceQueryDto,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    this.ensureSystemUser(req);
+    return this.employeesService.getAttendance(employeeId, companyId, query);
+  }
+
+  @Get('companies/:companyId/employees/:employeeId/salary')
+  @RequirePermissions(Permission.USERS_READ)
+  getCompanyEmployeeSalary(
+    @Param('companyId') companyId: string,
+    @Param('employeeId') employeeId: string,
+    @Query() query: EmployeeSalaryQueryDto,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    this.ensureSystemUser(req);
+    return this.employeesService.getSalary(employeeId, companyId, query);
   }
 
   @Get('system/employees')

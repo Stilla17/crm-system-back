@@ -1,4 +1,5 @@
 import {
+  BadGatewayException,
   BadRequestException,
   ConflictException,
   HttpException,
@@ -19,6 +20,126 @@ import { VerifixService } from '../verifix/verifix.service.js';
 import { VerifixEmployee } from '../verifix/types/verifix-employee.type.js';
 import { UpdateEmployeeDto } from './dto/update-employee.dto.js';
 import { CompaniesService } from '../companies/companies.service.js';
+import { EmployeeAttendanceQueryDto } from './dto/employee-attendance-query.dto.js';
+import { VerifixTrack } from '../verifix/types/verifix-track.type.js';
+import { EmployeeSalaryQueryDto } from './dto/employee-salary-query.dto.js';
+import type {
+  VerifixPaymentDay,
+  VerifixPaymentInterval,
+} from '../verifix/types/verifix-payment.type.js';
+
+const VERIFIX_DATE_TIME_PATTERN =
+  /^(\d{2})\.(\d{2})\.(\d{4}) (\d{2}):(\d{2}):(\d{2})$/;
+
+const toVerifixDateTime = (value: string, endOfDay = false) => {
+  const [year, month, day] = value.split('-');
+  return `${day}.${month}.${year} ${endOfDay ? '23:59:59' : '00:00:00'}`;
+};
+
+const parseVerifixTrackDateTime = (value: string) => {
+  const match = VERIFIX_DATE_TIME_PATTERN.exec(value);
+
+  if (!match) {
+    throw new BadRequestException(
+      `Verifix track_datetime formati noto\u2018g\u2018ri: ${value}`,
+    );
+  }
+
+  const [, day, month, year, hour, minute, second] = match;
+
+  return {
+    date: `${year}-${month}-${day}`,
+    iso: `${year}-${month}-${day}T${hour}:${minute}:${second}+05:00`,
+  };
+};
+
+const toVerifixDate = (value: string) => {
+  const [year, month, day] = value.split('-');
+  return `${day}.${month}.${year}`;
+};
+
+const parseVerifixDate = (value: string) => {
+  const match = /^(\d{2})\.(\d{2})\.(\d{4})$/.exec(value);
+
+  if (!match) {
+    throw new BadGatewayException(
+      `Verifix salary sanasi noto\u2018g\u2018ri formatda qaytdi: ${value}`,
+    );
+  }
+
+  return `${match[3]}-${match[2]}-${match[1]}`;
+};
+
+const parseVerifixAmount = (
+  value: string | number | null | undefined,
+  field: string,
+) => {
+  if (value === null || value === undefined || value === '') return 0;
+
+  const parsed = Number(value);
+
+  if (!Number.isFinite(parsed)) {
+    throw new BadGatewayException(
+      `Verifix ${field} maydoni noto\u2018g\u2018ri formatda qaytdi`,
+    );
+  }
+
+  return parsed;
+};
+
+const normalizePaymentInterval = (interval: VerifixPaymentInterval) => ({
+  inputId:
+    interval.input_id === null || interval.input_id === undefined
+      ? null
+      : String(interval.input_id),
+  inputLocationId:
+    interval.input_location_id === null ||
+    interval.input_location_id === undefined
+      ? null
+      : String(interval.input_location_id),
+  inputLocationName: interval.input_location_name ?? null,
+  inputTime: interval.input_time ?? null,
+  outputId:
+    interval.output_id === null || interval.output_id === undefined
+      ? null
+      : String(interval.output_id),
+  outputLocationId:
+    interval.output_location_id === null ||
+    interval.output_location_id === undefined
+      ? null
+      : String(interval.output_location_id),
+  outputLocationName: interval.output_location_name ?? null,
+  outputTime: interval.output_time ?? null,
+  turnoutTimeSeconds: parseVerifixAmount(
+    interval.turnout_time,
+    'turnout_time',
+  ),
+  wageAmount: parseVerifixAmount(interval.wage_amount, 'wage_amount'),
+  overtimeTimeSeconds: parseVerifixAmount(
+    interval.overtime_time,
+    'overtime_time',
+  ),
+  overtimeAmount: parseVerifixAmount(
+    interval.overtime_amount,
+    'overtime_amount',
+  ),
+});
+
+const normalizePaymentDay = (day: VerifixPaymentDay) => ({
+  date: parseVerifixDate(day.date),
+  jobId:
+    day.job_id === null || day.job_id === undefined
+      ? null
+      : String(day.job_id),
+  planTimeSeconds: parseVerifixAmount(
+    day.plan_time_seconds,
+    'plan_time_seconds',
+  ),
+  dayKind: day.day_kind ?? null,
+  dayKindName: day.day_kind_name ?? null,
+  wage: parseVerifixAmount(day.wage, 'wage'),
+  intervals: (day.intervals ?? []).map(normalizePaymentInterval),
+});
 
 const normalizePhone = (value?: string | null) => {
   if (!value) return null;
@@ -484,6 +605,173 @@ export class EmployeesService {
     }
 
     return employee;
+  }
+
+  async getAttendance(
+    id: string,
+    companyId: string,
+    query: EmployeeAttendanceQueryDto,
+  ) {
+    if (query.from > query.to) {
+      throw new BadRequestException(
+        'Davomat davrida from sanasi to sanasidan keyin bo\u2018lishi mumkin emas',
+      );
+    }
+
+    const fromDate = new Date(`${query.from}T00:00:00Z`);
+    const toDate = new Date(`${query.to}T00:00:00Z`);
+    const periodInDays =
+      Math.floor((toDate.getTime() - fromDate.getTime()) / 86_400_000) + 1;
+
+    if (periodInDays > 366) {
+      throw new BadRequestException(
+        'Davomat davri 366 kundan oshmasligi kerak',
+      );
+    }
+
+    const employee = await this.getById(id, companyId);
+
+    if (!employee.verifixEmployeeId) {
+      throw new BadRequestException(
+        'Xodim Verifix bilan bog\u2018lanmagan',
+      );
+    }
+
+    const tracks = await this.verifixService.listEmployeeTracks(
+      String(employee.verifixEmployeeId),
+      toVerifixDateTime(query.from),
+      toVerifixDateTime(query.to, true),
+    );
+
+    const tracksByDate = new Map<
+      string,
+      Array<{ track: VerifixTrack; iso: string }>
+    >();
+
+    for (const track of tracks) {
+      const parsed = parseVerifixTrackDateTime(track.track_datetime);
+      const dayTracks = tracksByDate.get(parsed.date) ?? [];
+      dayTracks.push({ track, iso: parsed.iso });
+      tracksByDate.set(parsed.date, dayTracks);
+    }
+
+    const items = [...tracksByDate.entries()]
+      .sort(([left], [right]) => right.localeCompare(left))
+      .map(([date, dayTracks]) => {
+        const sortedTracks = dayTracks.sort((left, right) =>
+          left.iso.localeCompare(right.iso),
+        );
+        const checkIn = sortedTracks.find(
+          ({ track }) => track.track_type === 'I',
+        );
+        const checkOut = sortedTracks.findLast(
+          ({ track }) => track.track_type === 'O',
+        );
+
+        return {
+          date,
+          checkInAt: checkIn?.iso ?? null,
+          checkOutAt: checkOut?.iso ?? null,
+          trackCount: sortedTracks.length,
+        };
+      });
+
+    return {
+      period: {
+        from: query.from,
+        to: query.to,
+      },
+      summary: {
+        recordedDays: items.length,
+        daysWithCheckIn: items.filter((item) => item.checkInAt).length,
+        totalTrackEvents: tracks.length,
+      },
+      items,
+    };
+  }
+
+  async getSalary(
+    id: string,
+    companyId: string,
+    query: EmployeeSalaryQueryDto,
+  ) {
+    if (query.from > query.to) {
+      throw new BadRequestException(
+        'Ish haqi davrida from sanasi to sanasidan keyin bo\u2018lishi mumkin emas',
+      );
+    }
+
+    const fromDate = new Date(`${query.from}T00:00:00Z`);
+    const toDate = new Date(`${query.to}T00:00:00Z`);
+    const periodInDays =
+      Math.floor((toDate.getTime() - fromDate.getTime()) / 86_400_000) + 1;
+
+    if (periodInDays > 31) {
+      throw new BadRequestException(
+        'Verifix ish haqi davri 31 kundan oshmasligi kerak',
+      );
+    }
+
+    const employee = await this.getById(id, companyId);
+
+    if (!employee.verifixEmployeeId) {
+      throw new BadRequestException(
+        'Xodim Verifix bilan bog\u2018lanmagan',
+      );
+    }
+
+    const response = await this.verifixService.getEmployeePaymentsByTime(
+      String(employee.verifixEmployeeId),
+      toVerifixDate(query.from),
+      toVerifixDate(query.to),
+    );
+
+    if (!response || !Array.isArray(response.employees)) {
+      throw new BadGatewayException(
+        'Verifix ish haqi ma\u2018lumotlari noto\u2018g\u2018ri formatda qaytdi',
+      );
+    }
+
+    const paymentEmployee = response.employees.find(
+      (item) => String(item.employee_id) === String(employee.verifixEmployeeId),
+    );
+    const days = (paymentEmployee?.days ?? [])
+      .map(normalizePaymentDay)
+      .sort((left, right) => right.date.localeCompare(left.date));
+    const intervals = days.flatMap((day) => day.intervals);
+
+    return {
+      period: {
+        from: query.from,
+        to: query.to,
+      },
+      staffId:
+        paymentEmployee?.staff_id === null ||
+        paymentEmployee?.staff_id === undefined
+          ? null
+          : String(paymentEmployee.staff_id),
+      summary: {
+        totalWage: days.reduce((sum, day) => sum + day.wage, 0),
+        plannedTimeSeconds: days.reduce(
+          (sum, day) => sum + day.planTimeSeconds,
+          0,
+        ),
+        turnoutTimeSeconds: intervals.reduce(
+          (sum, interval) => sum + interval.turnoutTimeSeconds,
+          0,
+        ),
+        overtimeTimeSeconds: intervals.reduce(
+          (sum, interval) => sum + interval.overtimeTimeSeconds,
+          0,
+        ),
+        overtimeAmount: intervals.reduce(
+          (sum, interval) => sum + interval.overtimeAmount,
+          0,
+        ),
+        workedDays: days.filter((day) => day.intervals.length > 0).length,
+      },
+      days,
+    };
   }
 
   async update(id: string, dto: UpdateEmployeeDto, companyId: string) {

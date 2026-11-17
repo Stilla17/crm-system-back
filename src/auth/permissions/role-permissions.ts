@@ -33,6 +33,8 @@ export const DIRECTOR_PERMISSIONS: Permission[] = [
   Permission.PAYMENTS_CREATE,
   Permission.PAYMENTS_UPDATE,
   Permission.PAYMENTS_DELETE,
+
+  Permission.SALES_READ,
 ];
 
 export const MANAGER_PERMISSIONS: Permission[] = [
@@ -47,4 +49,6 @@ export const MANAGER_PERMISSIONS: Permission[] = [
   Permission.SHIPMENTS_UPDATE,
 
   Permission.PAYMENTS_READ,
+
+  Permission.SALES_READ,
 ];
