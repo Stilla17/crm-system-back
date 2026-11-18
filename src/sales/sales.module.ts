@@ -7,14 +7,24 @@ import {
   SalesSummaryCache,
   SalesSummaryCacheSchema,
 } from './schemas/sales-summary-cache.schema.js';
+import {
+  BranchSalesPlan,
+  BranchSalesPlanSchema,
+} from './schemas/branch-sales-plan.schema.js';
+import { MoyskladSyncModule } from '../moysklad-sync/moysklad-sync.module.js';
 
 @Module({
   imports: [
     MoyskladModule,
+    MoyskladSyncModule,
     MongooseModule.forFeature([
       {
         name: SalesSummaryCache.name,
         schema: SalesSummaryCacheSchema,
+      },
+      {
+        name: BranchSalesPlan.name,
+        schema: BranchSalesPlanSchema,
       },
     ]),
   ],

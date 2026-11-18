@@ -7,19 +7,25 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { MoyskladClient } from '../moysklad/moysklad.client.js';
-import type { SalesSummaryQueryDto } from './dto/sales-summary-query.dto.js';
+import {
+  BranchSalesType,
+  type SalesSummaryQueryDto,
+} from './dto/sales-summary-query.dto.js';
 import {
   SalesSummaryCache,
   SalesSummaryCacheDocument,
 } from './schemas/sales-summary-cache.schema.js';
 import type { SalesSummaryResponse } from './types/sales-summary.type.js';
-import type { MoyskladDocument } from '../moysklad/types/moysklad-document.type.js';
+import {
+  BranchSalesPlan,
+  BranchSalesPlanDocument,
+} from './schemas/branch-sales-plan.schema.js';
+import { MoyskladSyncService } from '../moysklad-sync/moysklad-sync.service.js';
 
 const MILLISECONDS_PER_DAY = 86_400_000;
 const CURRENT_PERIOD_CACHE_MS = 5 * 60_000;
 const CLOSED_PERIOD_CACHE_MS = 24 * 60 * 60_000;
 const MAX_PERIOD_DAYS = 366;
-const BRANCH_CACHE_DURATION_MS = 10 * 60_000;
 
 type BranchSummaryItem = {
   id: string;
@@ -38,8 +44,12 @@ export class SalesService implements OnApplicationBootstrap {
 
   constructor(
     private readonly moyskladClient: MoyskladClient,
+    private readonly moyskladSyncService: MoyskladSyncService,
     @InjectModel(SalesSummaryCache.name)
     private readonly salesSummaryCacheModel: Model<SalesSummaryCacheDocument>,
+
+    @InjectModel(BranchSalesPlan.name)
+    private readonly branchSalesPlanModel: Model<BranchSalesPlanDocument>,
   ) {}
 
   onApplicationBootstrap() {
@@ -52,19 +62,6 @@ export class SalesService implements OnApplicationBootstrap {
       );
     });
   }
-
-  private readonly branchSummaryCache = new Map<
-    string,
-    {
-      data: BranchSummaryItem[];
-      expiresAt: number;
-    }
-  >();
-
-  private readonly pendingBranchSummaries = new Map<
-    string,
-    Promise<BranchSummaryItem[]>
-  >();
 
   async getSummary(query: SalesSummaryQueryDto): Promise<SalesSummaryResponse> {
     this.validatePeriod(query);
@@ -100,98 +97,85 @@ export class SalesService implements OnApplicationBootstrap {
   ): Promise<BranchSummaryItem[]> {
     this.validatePeriod(query);
 
-    const cacheKey = `${query.from}:${query.to}`;
-    const cached = this.branchSummaryCache.get(cacheKey);
+    return this.calculateBranchesSummary(query);
+  }
 
-    if (cached && cached.expiresAt > Date.now()) {
-      return cached.data;
-    }
+  async upsertBranchPlan(retailStoreId: string, month: string, amount: number) {
+    const plan = await this.branchSalesPlanModel
+      .findOneAndUpdate(
+        {
+          retailStoreId,
+          month,
+        },
+        {
+          $set: {
+            amount,
+          },
+        },
+        {
+          upsert: true,
+          new: true,
+          setDefaultsOnInsert: true,
+        },
+      )
+      .lean()
+      .exec();
 
-    const pending = this.pendingBranchSummaries.get(cacheKey);
-
-    if (pending) {
-      return pending;
-    }
-
-    const calculation = this.calculateBranchesSummary(query)
-      .then((data) => {
-        this.branchSummaryCache.set(cacheKey, {
-          data,
-          expiresAt: Date.now() + BRANCH_CACHE_DURATION_MS,
-        });
-
-        return data;
-      })
-      .finally(() => {
-        this.pendingBranchSummaries.delete(cacheKey);
-      });
-
-    this.pendingBranchSummaries.set(cacheKey, calculation);
-
-    return calculation;
+    return plan;
   }
 
   private async calculateBranchesSummary(
     query: SalesSummaryQueryDto,
   ): Promise<BranchSummaryItem[]> {
-    const [stores, sales, returns] = await Promise.all([
-      this.moyskladClient.listAllRetailStores(),
-      this.moyskladClient.listAllDocuments(
-        'retaildemand',
-        query.from,
-        query.to,
-      ),
-      this.moyskladClient.listAllDocuments(
-        'retailsalesreturn',
-        query.from,
-        query.to,
-      ),
+    const month = query.from.slice(0, 7);
+    const salesType = query.type ?? BranchSalesType.ALL;
+
+    const [totals, plans] = await Promise.all([
+      this.moyskladSyncService.getBranchPeriodTotals(query.from, query.to),
+      this.branchSalesPlanModel.find({ month }).lean().exec(),
     ]);
 
-    const resultByStoreId = new Map<string, number>();
+    const getResultMinor = (total: (typeof totals)[number]) => {
+      switch (salesType) {
+        case BranchSalesType.RETAIL:
+          return total.retailSalesMinor;
 
-    for (const sale of sales) {
-      const storeId = this.getRetailStoreId(sale);
+        case BranchSalesType.SHIPMENT:
+          return total.shipmentSalesMinor;
 
-      if (!storeId) {
-        continue;
+        case BranchSalesType.ALL:
+        default:
+          return total.salesMinor;
       }
+    };
 
-      resultByStoreId.set(
-        storeId,
-        (resultByStoreId.get(storeId) ?? 0) + sale.sum,
-      );
-    }
+    const nonZeroTotals = totals.filter((total) => getResultMinor(total) !== 0);
 
-    for (const salesReturn of returns) {
-      const storeId = this.getRetailStoreId(salesReturn);
+    const resultByStoreId = new Map(
+      nonZeroTotals.map((total) => [
+        total.retailStoreId,
+        getResultMinor(total),
+      ]),
+    );
 
-      if (!storeId) {
-        continue;
-      }
+    const planByStoreId = new Map(
+      plans.map((plan) => [plan.retailStoreId, plan.amount]),
+    );
 
-      resultByStoreId.set(
-        storeId,
-        (resultByStoreId.get(storeId) ?? 0) - salesReturn.sum,
-      );
-    }
+    const stores = await this.moyskladSyncService.getRetailStoresByIds(
+      nonZeroTotals.map((total) => total.retailStoreId),
+    );
 
     return stores.map((store) => ({
-      id: store.id,
+      id: store.moyskladId,
       name: store.name,
-      monthlyPlan: 0,
-      result: Number(((resultByStoreId.get(store.id) ?? 0) / 100).toFixed(2)),
+
+      monthlyPlan: planByStoreId.get(store.moyskladId) ?? 0,
+
+      result: Number(
+        ((resultByStoreId.get(store.moyskladId) ?? 0) / 100).toFixed(2),
+      ),
     }));
-  }
-
-  private getRetailStoreId(document: MoyskladDocument): string | null {
-    const href = document.retailStore?.meta.href;
-    if (!href) {
-      return null;
-    }
-
-    const id = href.split('/').filter(Boolean).at(-1);
-    return id ?? null;
   }
 
   private refreshOnce(

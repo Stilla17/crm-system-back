@@ -10,6 +10,8 @@ import {
   MoyskladListResponse,
   MoyskladRetailStore,
   MoyskladSalesEntity,
+  MoyskladSalesPlotSeriesItem,
+  MoyskladSalesPlotSeriesResponse,
 } from './types/moysklad-document.type.js';
 
 const PAGE_LIMIT = 1000;
@@ -32,6 +34,58 @@ export class MoyskladClient {
       .replace(/\/+$/, '');
 
     this.token = this.configService.getOrThrow<string>('MOYSKLAD_TOKEN');
+  }
+
+  // barcha savdolar, ya’ni Все
+  async getSalesPlotSeriesByStore(
+    storeHref: string,
+    from: string,
+    to: string,
+  ): Promise<MoyskladSalesPlotSeriesItem[]> {
+    const response = await this.request<MoyskladSalesPlotSeriesResponse>(
+      '/report/sales/plotseries',
+      {
+        momentFrom: `${from} 00:00:00`,
+        momentTo: `${to} 23:59:59`,
+        interval: 'day',
+        filter: `store=${storeHref}`,
+      },
+    );
+
+    if (!response || !Array.isArray(response.series)) {
+      throw new BadGatewayException(
+        'MoySklad tayyor savdo hisobotini noto‘g‘ri formatda qaytardi',
+      );
+    }
+
+    return response.series;
+  }
+
+  // chakana savdo, ya’ni Продажа
+  async getSalesPlotSeriesByRetailStore(
+    retailStoreId: string,
+    from: string,
+    to: string,
+  ): Promise<MoyskladSalesPlotSeriesItem[]> {
+    const retailStoreHref = `${this.baseUrl}/entity/retailstore/${retailStoreId}`;
+
+    const response = await this.request<MoyskladSalesPlotSeriesResponse>(
+      '/report/sales/plotseries',
+      {
+        momentFrom: `${from} 00:00:00`,
+        momentTo: `${to} 23:59:59`,
+        interval: 'day',
+        filter: `retailStore=${retailStoreHref}`,
+      },
+    );
+
+    if (!response || !Array.isArray(response.series)) {
+      throw new BadGatewayException(
+        'MoySklad chakana savdo hisobotini noto‘g‘ri formatda qaytardi',
+      );
+    }
+
+    return response.series;
   }
 
   async listAllDocuments(

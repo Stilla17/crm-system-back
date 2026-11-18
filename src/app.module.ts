@@ -16,6 +16,8 @@ import { getMongoConnectionUri } from './config/mongodb-uri.js';
 import { VerifixModule } from './verifix/verifix.module.js';
 import { EmployeesModule } from './employees/employees.module.js';
 import { SalesModule } from './sales/sales.module.js';
+import { MoyskladSyncModule } from './moysklad-sync/moysklad-sync.module.js';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
@@ -24,7 +26,7 @@ import { SalesModule } from './sales/sales.module.js';
     }),
 
     MongooseModule.forRootAsync({
-      imports: [ConfigModule],
+      imports: [ConfigModule, ScheduleModule.forRoot()],
       inject: [ConfigService],
       useFactory: async (configService: ConfigService) => ({
         uri: getMongoConnectionUri(
@@ -44,6 +46,7 @@ import { SalesModule } from './sales/sales.module.js';
     VerifixModule,
     SalesModule,
     EmployeesModule,
+    MoyskladSyncModule,
   ],
   controllers: [AppController],
   providers: [AppService],

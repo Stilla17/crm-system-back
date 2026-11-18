@@ -5,6 +5,7 @@ export interface MoyskladDocument {
   id: string;
   name: string;
   moment: string;
+  updated?: string;
   applicable: boolean;
   sum: number;
 
@@ -41,6 +42,22 @@ export interface MoyskladRetailStore {
   id: string;
   name: string;
   archived: boolean;
-  externalCode: string;
+  externalCode?: string;
   organization: MoyskladOrganization;
+
+  store: {
+    meta: {
+      href: string;
+    };
+  };
+}
+
+export interface MoyskladSalesPlotSeriesItem {
+  date: string;
+  quantity: number;
+  sum: number;
+}
+
+export interface MoyskladSalesPlotSeriesResponse {
+  series: MoyskladSalesPlotSeriesItem[];
 }
