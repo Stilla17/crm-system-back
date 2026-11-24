@@ -69,6 +69,39 @@ export class MoyskladSyncScheduler {
     );
   }
 
+  @Cron('0 0 3 * * *', {
+    name: 'moysklad-sync-products',
+    timeZone: TASHKENT_TIME_ZONE,
+    waitForCompletion: true,
+  })
+  syncProducts(): Promise<void> {
+    const task = this.syncQueue.then(async () => {
+      const isDue = await this.moyskladSyncService.isBranchProductSyncDue();
+
+      if (!isDue) {
+        this.logger.log(
+          'Filial mahsulotlari sync o‘tkazib yuborildi: oxirgi syncga 3 kun bo‘lmagan',
+        );
+        return;
+      }
+
+      this.logger.log('Filial mahsulotlari sync boshlandi');
+
+      const result = await this.moyskladSyncService.syncBranchProducts();
+
+      this.logger.log(
+        `Filial mahsulotlari sync tugadi: ${JSON.stringify(result)}`,
+      );
+    });
+
+    this.syncQueue = task.catch((error: unknown) => {
+      const message = error instanceof Error ? error.stack : String(error);
+      this.logger.error('Filial mahsulotlari sync xatosi', message);
+    });
+
+    return task;
+  }
+
   private enqueueSync(date: string, label: string): Promise<void> {
     const task = this.syncQueue.then(() => this.runSync(date, label));
 

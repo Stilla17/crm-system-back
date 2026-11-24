@@ -23,4 +23,16 @@ export class MoyskladController {
       }))
       .sort((first, second) => first.name.localeCompare(second.name, 'uz'));
   }
+
+  @Get('organizations')
+  async getOrganizations() {
+    const organizations = await this.moyskladClient.listAllOrganizations();
+
+    return organizations
+      .map((organization) => ({
+        id: organization.id,
+        name: organization.name,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name, 'uz'));
+  }
 }

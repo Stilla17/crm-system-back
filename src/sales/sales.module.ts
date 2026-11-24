@@ -12,11 +12,13 @@ import {
   BranchSalesPlanSchema,
 } from './schemas/branch-sales-plan.schema.js';
 import { MoyskladSyncModule } from '../moysklad-sync/moysklad-sync.module.js';
+import { CompaniesModule } from '../companies/companies.module.js';
 
 @Module({
   imports: [
     MoyskladModule,
     MoyskladSyncModule,
+    CompaniesModule,
     MongooseModule.forFeature([
       {
         name: SalesSummaryCache.name,

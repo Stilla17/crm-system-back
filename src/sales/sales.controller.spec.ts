@@ -14,6 +14,10 @@ describe('SalesController', () => {
             provide: SalesService,
             useValue: {
               getSummary: async () => ({}),
+              getProductBranchAnalysis: async (
+                branchId: string,
+                productId: string,
+              ) => ({ branchId, productId }),
             },
           },
         ],
@@ -25,5 +29,14 @@ describe('SalesController', () => {
 
   it('should be defined', () => {
     expect(controller).toBeDefined();
+  });
+
+  it('passes the selected branch and product to the analysis service', async () => {
+    await expect(
+      controller.getProductBranchAnalysis('qarshi', 'product-1'),
+    ).resolves.toEqual({
+      branchId: 'qarshi',
+      productId: 'product-1',
+    });
   });
 });

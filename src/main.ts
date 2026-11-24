@@ -9,7 +9,10 @@ async function bootstrap() {
   app.setGlobalPrefix('api/v1');
 
   app.enableCors({
-    origin: 'http://localhost:3000',
+    origin: [
+      'http://localhost:3000',
+      'https://p3mw9jbc-3000.eun1.devtunnels.ms',
+    ],
     credentials: true,
   });
 

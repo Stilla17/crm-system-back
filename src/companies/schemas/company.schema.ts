@@ -49,6 +49,12 @@ export class Company {
   type: string;
 
   @Prop({
+    type: [String],
+    default: [],
+  })
+  moyskladOrganizationIds: string[];
+
+  @Prop({
     type: Boolean,
     default: true,
   })

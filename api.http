@@ -201,3 +201,11 @@ Content-Type: application/json
   "status": "active"
 }
 
+
+### SALES PRODUCT ANALYSIS
+@branchId = MOYSKLAD_BRANCH_ID
+@productId = MOYSKLAD_PRODUCT_ID
+
+### Tanlangan mahsulot qaysi filialda yaxshi sotilishini tahlil qilish
+GET {{baseUrl}}/sales/branches/{{branchId}}/products/{{productId}}/analysis
+

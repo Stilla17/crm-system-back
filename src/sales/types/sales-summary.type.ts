@@ -29,3 +29,4 @@ export interface SalesSummaryResponse {
   };
   source: 'moysklad';
 }
+

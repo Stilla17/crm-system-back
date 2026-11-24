@@ -110,10 +110,7 @@ const normalizePaymentInterval = (interval: VerifixPaymentInterval) => ({
       : String(interval.output_location_id),
   outputLocationName: interval.output_location_name ?? null,
   outputTime: interval.output_time ?? null,
-  turnoutTimeSeconds: parseVerifixAmount(
-    interval.turnout_time,
-    'turnout_time',
-  ),
+  turnoutTimeSeconds: parseVerifixAmount(interval.turnout_time, 'turnout_time'),
   wageAmount: parseVerifixAmount(interval.wage_amount, 'wage_amount'),
   overtimeTimeSeconds: parseVerifixAmount(
     interval.overtime_time,
@@ -128,9 +125,7 @@ const normalizePaymentInterval = (interval: VerifixPaymentInterval) => ({
 const normalizePaymentDay = (day: VerifixPaymentDay) => ({
   date: parseVerifixDate(day.date),
   jobId:
-    day.job_id === null || day.job_id === undefined
-      ? null
-      : String(day.job_id),
+    day.job_id === null || day.job_id === undefined ? null : String(day.job_id),
   planTimeSeconds: parseVerifixAmount(
     day.plan_time_seconds,
     'plan_time_seconds',
@@ -632,9 +627,7 @@ export class EmployeesService {
     const employee = await this.getById(id, companyId);
 
     if (!employee.verifixEmployeeId) {
-      throw new BadRequestException(
-        'Xodim Verifix bilan bog\u2018lanmagan',
-      );
+      throw new BadRequestException('Xodim Verifix bilan bog\u2018lanmagan');
     }
 
     const tracks = await this.verifixService.listEmployeeTracks(
@@ -715,9 +708,7 @@ export class EmployeesService {
     const employee = await this.getById(id, companyId);
 
     if (!employee.verifixEmployeeId) {
-      throw new BadRequestException(
-        'Xodim Verifix bilan bog\u2018lanmagan',
-      );
+      throw new BadRequestException('Xodim Verifix bilan bog\u2018lanmagan');
     }
 
     const response = await this.verifixService.getEmployeePaymentsByTime(

@@ -13,6 +13,10 @@ import {
   MoyskladRetailStoreSchema,
 } from './schema/moysklad-retail-store.schema.js';
 import { MoyskladSyncScheduler } from './moysklad-sync.scheduler.js';
+import {
+  BranchProductStat,
+  BranchProductStatSchema,
+} from './schema/branch-product-stat.schema.js';
 
 @Module({
   imports: [
@@ -26,6 +30,10 @@ import { MoyskladSyncScheduler } from './moysklad-sync.scheduler.js';
       {
         name: MoyskladRetailStore.name,
         schema: MoyskladRetailStoreSchema,
+      },
+      {
+        name: BranchProductStat.name,
+        schema: BranchProductStatSchema,
       },
     ]),
   ],

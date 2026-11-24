@@ -1,4 +1,4 @@
-import { IsEnum, IsOptional, Matches } from 'class-validator';
+import { IsEnum, IsOptional, IsUUID, Matches } from 'class-validator';
 
 export enum BranchSalesType {
   ALL = 'all',
@@ -22,4 +22,8 @@ export class SalesSummaryQueryDto {
     message: 'type all, shipment yoki retail bo‘lishi kerak',
   })
   type?: BranchSalesType;
+
+  @IsOptional()
+  @IsUUID()
+  companyId?: string;
 }
